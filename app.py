@@ -56,7 +56,7 @@ T = {
         ),
         "prompt_instruction": (
             "Analyse le devis PDF ci-joint et retourne un objet JSON STRICT en"
-            " FRANÇAIS respectant cette structure exacte :"
+            " FRANÇAIS respectant cette structure :"
         ),
     },
     "English": {
@@ -93,7 +93,7 @@ T = {
         ),
         "prompt_instruction": (
             "Analyze the attached tender PDF and return a STRICT JSON object in"
-            " ENGLISH matching this exact structure:"
+            " ENGLISH matching this structure:"
         ),
     },
 }
@@ -134,17 +134,19 @@ def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
             candidate_list.append(m)
 
     payload = {
-        "contents": [{
-            "parts": [
-                {"text": prompt_text},
-                {
-                    "inline_data": {
-                        "mime_type": "application/pdf",
-                        "data": pdf_b64,
-                    }
-                },
-            ]
-        }],
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt_text},
+                    {
+                        "inline_data": {
+                            "mime_type": "application/pdf",
+                            "data": pdf_b64,
+                        }
+                    },
+                ]
+            }
+        ],
         "generationConfig": {"responseMimeType": "application/json"},
     }
 
@@ -202,7 +204,64 @@ if uploaded_file is not None:
                 pdf_bytes = uploaded_file.read()
                 pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
-                # 3. Build prompt safely without f-string bracket escaping issues
-                schema_template = (
-                    "{\n"
-                    '
+                # 3. Build prompt safely via Python dictionary to prevent quote syntax issues
+                schema_dict = {
+                    "mandatory_disqualifiers": [
+                        {
+                            "category": "Category / Catégorie",
+                            "requirement": "Description",
+                            "penalty_or_impact": "Disqualification / Rejet automatique",
+                        }
+                    ],
+                    "required_attachments_and_forms": [
+                        "List of mandatory forms, bonds, certificates"
+                    ],
+                    "technical_scoring_criteria": [
+                        "Scoring criteria & points distribution"
+                    ],
+                    "product_and_environmental_standards": [
+                        "EcoLogo, WHMIS/SIMDUT, chemical dispensing & equipment requirements"
+                    ],
+                }
+
+                prompt = (
+                    f"{t['prompt_role']}\n\n"
+                    f"{t['prompt_instruction']}\n"
+                    f"{json.dumps(schema_dict, indent=2)}"
+                )
+
+                # 4. Process via robust multi-model fallback
+                data = run_gemini_analysis(api_key, prompt, pdf_base64)
+
+                st.success(t["success_text"])
+
+                # 5. Display Results in 2 Columns
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.subheader(t["section_mandatory"])
+                    for item in data.get("mandatory_disqualifiers", []):
+                        st.error(
+                            f"**[{item.get('category', t['category_default'])}]** "
+                            f"{item.get('requirement', '')}  \n"
+                            f"*{t['impact_label']} : {item.get('penalty_or_impact', 'Mandatory')}*"
+                        )
+
+                    st.subheader(t["section_forms"])
+                    for form in data.get("required_attachments_and_forms", []):
+                        st.markdown(f"• {form}")
+
+                with col2:
+                    st.subheader(t["section_scoring"])
+                    for score in data.get("technical_scoring_criteria", []):
+                        st.info(f"**Pointage / Scoring:** {score}")
+
+                    st.subheader(t["section_standards"])
+                    for std in data.get("product_and_environmental_standards", []):
+                        st.markdown(f"• {std}")
+
+            except urllib.error.HTTPError as e:
+                error_details = e.read().decode("utf-8")
+                st.error(f"API Error ({e.code}): {error_details}")
+            except Exception as e:
+                st.error(f"{t['error_generic']} {str(e)}")
