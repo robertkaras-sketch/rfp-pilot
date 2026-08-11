@@ -100,6 +100,32 @@ T = {
 
 t = T[lang]
 
+# ----------------- HELPER: AUTO-DETECT WORKING MODEL ----------------- #
+def find_available_model(api_key: str) -> str:
+    """Finds an active, supported Gemini model on the account automatically."""
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            available = [
+                m["name"].replace("models/", "")
+                for m in data.get("models", [])
+                if "generateContent" in m.get("supportedGenerationMethods", [])
+                and "gemini" in m.get("name", "").lower()
+            ]
+            # Prioritize fast Flash models first
+            flash_models = [m for m in available if "flash" in m.lower()]
+            if flash_models:
+                return flash_models[0]
+            if available:
+                return available[0]
+    except Exception:
+        pass
+    # Reliable default fallback
+    return "gemini-1.5-flash-latest"
+
+
 # ----------------- UI HEADER ----------------- #
 st.title(t["title"])
 st.caption(t["caption"])
@@ -119,7 +145,10 @@ if uploaded_file is not None:
                     st.error(t["error_api_key"])
                     st.stop()
 
-                # 2. Convert PDF bytes directly to base64 (Zero external dependencies)
+                # 2. Automatically find the active model
+                model_name = find_available_model(api_key)
+
+                # 3. Convert PDF bytes to base64
                 pdf_bytes = uploaded_file.read()
                 pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
@@ -137,8 +166,8 @@ if uploaded_file is not None:
                 }}
                 """
 
-                # 3. Direct Gemini API Call with native inline PDF support
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+                # 4. Direct Gemini API Call with dynamic model name
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
                 payload = {
                     "contents": [{
                         "parts": [
@@ -167,7 +196,7 @@ if uploaded_file is not None:
 
                 st.success(t["success_text"])
 
-                # 4. Render Results in 2 Clean Columns
+                # 5. Render Results in 2 Clean Columns
                 col1, col2 = st.columns(2)
 
                 with col1:
