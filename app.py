@@ -108,22 +108,22 @@ st.caption(t["caption"])
 uploaded_file = st.file_uploader(t["upload_label"], type=["pdf"])
 
 if uploaded_file is not None:
-  if st.button(t["button_text"], type="primary"):
-    with st.spinner(t["spinner_text"]):
-      try:
-        # 1. Retrieve API Key
-        api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get(
-            "GEMINI_API_KEY"
-        )
-        if not api_key:
-          st.error(t["error_api_key"])
-          st.stop()
+    if st.button(t["button_text"], type="primary"):
+        with st.spinner(t["spinner_text"]):
+            try:
+                # 1. Retrieve API Key
+                api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get(
+                    "GEMINI_API_KEY"
+                )
+                if not api_key:
+                    st.error(t["error_api_key"])
+                    st.stop()
 
-        # 2. Convert PDF bytes directly to base64 (Zero external dependencies)
-        pdf_bytes = uploaded_file.read()
-        pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+                # 2. Convert PDF bytes directly to base64 (Zero external dependencies)
+                pdf_bytes = uploaded_file.read()
+                pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
-        prompt = f"""
+                prompt = f"""
                 {t["prompt_role"]}
                 
                 {t["prompt_instruction"]}
@@ -137,63 +137,63 @@ if uploaded_file is not None:
                 }}
                 """
 
-        # 3. Direct Gemini API Call with native inline PDF support
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"text": prompt},
-                    {
-                        "inline_data": {
-                            "mime_type": "application/pdf",
-                            "data": pdf_base64,
-                        }
-                    },
-                ]
-            }],
-            "generationConfig": {"responseMimeType": "application/json"},
-        }
+                # 3. Direct Gemini API Call with native inline PDF support
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+                payload = {
+                    "contents": [{
+                        "parts": [
+                            {"text": prompt},
+                            {
+                                "inline_data": {
+                                    "mime_type": "application/pdf",
+                                    "data": pdf_base64,
+                                }
+                            },
+                        ]
+                    }],
+                    "generationConfig": {"responseMimeType": "application/json"},
+                }
 
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-        )
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                )
 
-        with urllib.request.urlopen(req) as response:
-          result = json.loads(response.read().decode("utf-8"))
-          raw_text = result["candidates"][0]["content"]["parts"][0]["text"]
-          data = json.loads(raw_text)
+                with urllib.request.urlopen(req) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+                    raw_text = result["candidates"][0]["content"]["parts"][0]["text"]
+                    data = json.loads(raw_text)
 
-        st.success(t["success_text"])
+                st.success(t["success_text"])
 
-        # 4. Render Results in 2 Clean Columns
-        col1, col2 = st.columns(2)
+                # 4. Render Results in 2 Clean Columns
+                col1, col2 = st.columns(2)
 
-        with col1:
-          st.subheader(t["section_mandatory"])
-          for item in data.get("mandatory_disqualifiers", []):
-            st.error(
-                f"**[{item.get('category', t['category_default'])}]**"
-                f" {item.get('requirement', '')}  \n*{t['impact_label']} :"
-                f" {item.get('penalty_or_impact', 'Mandatory')}*"
-            )
+                with col1:
+                    st.subheader(t["section_mandatory"])
+                    for item in data.get("mandatory_disqualifiers", []):
+                        st.error(
+                            f"**[{item.get('category', t['category_default'])}]**"
+                            f" {item.get('requirement', '')}  \n*{t['impact_label']} :"
+                            f" {item.get('penalty_or_impact', 'Mandatory')}*"
+                        )
 
-          st.subheader(t["section_forms"])
-          for form in data.get("required_attachments_and_forms", []):
-            st.markdown(f"• {form}")
+                    st.subheader(t["section_forms"])
+                    for form in data.get("required_attachments_and_forms", []):
+                        st.markdown(f"• {form}")
 
-        with col2:
-          st.subheader(t["section_scoring"])
-          for score in data.get("technical_scoring_criteria", []):
-            st.info(f"**Pointage / Scoring:** {score}")
+                with col2:
+                    st.subheader(t["section_scoring"])
+                    for score in data.get("technical_scoring_criteria", []):
+                        st.info(f"**Pointage / Scoring:** {score}")
 
-          st.subheader(t["section_standards"])
-          for std in data.get("product_and_environmental_standards", []):
-            st.markdown(f"• {std}")
+                    st.subheader(t["section_standards"])
+                    for std in data.get("product_and_environmental_standards", []):
+                        st.markdown(f"• {std}")
 
-      except urllib.error.HTTPError as e:
-        error_details = e.read().decode("utf-8")
-        st.error(f"API Error ({e.code}): {error_details}")
-      except Exception as e:
-        st.error(f"{t['error_generic']} {str(e)}")
+            except urllib.error.HTTPError as e:
+                error_details = e.read().decode("utf-8")
+                st.error(f"API Error ({e.code}): {error_details}")
+            except Exception as e:
+                st.error(f"{t['error_generic']} {str(e)}")
