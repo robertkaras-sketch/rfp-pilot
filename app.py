@@ -1,8 +1,8 @@
+import base64
 import json
 import os
 import urllib.error
 import urllib.request
-from pypdf import PdfReader
 import streamlit as st
 
 # Page setup
@@ -29,7 +29,10 @@ T = {
         ),
         "upload_label": "Sélectionnez le fichier PDF du devis (RFP)",
         "button_text": "Lancer l'analyse du devis",
-        "spinner_text": "Analyse du devis en cours... (~15 secondes)",
+        "spinner_text": (
+            "Analyse directe du document PDF par l'IA en cours... (~15"
+            " secondes)"
+        ),
         "success_text": "Analyse complétée avec succès !",
         "error_api_key": (
             "Clé API manquante. Ajoutez GEMINI_API_KEY dans les Secrets"
@@ -52,8 +55,8 @@ T = {
             " SIMDUT)."
         ),
         "prompt_instruction": (
-            "Analyse le texte de devis suivant et retourne un objet JSON"
-            " STRICT en FRANÇAIS avec cette structure exacte :"
+            "Analyse le devis PDF ci-joint et retourne un objet JSON STRICT en"
+            " FRANÇAIS avec cette structure exacte :"
         ),
     },
     "English": {
@@ -65,7 +68,9 @@ T = {
         ),
         "upload_label": "Select the Tender PDF Document (RFP)",
         "button_text": "Analyze Tender Document",
-        "spinner_text": "Analyzing document... (~15 seconds)",
+        "spinner_text": (
+            "Analyzing PDF document directly via AI... (~15 seconds)"
+        ),
         "success_text": "Analysis completed successfully!",
         "error_api_key": (
             "Missing API key. Please add GEMINI_API_KEY in Streamlit Secrets."
@@ -87,8 +92,8 @@ T = {
             " CNESST/WCB, Janitorial Decree rules, EcoLogo, WHMIS)."
         ),
         "prompt_instruction": (
-            "Analyze the following tender text and return a STRICT JSON object"
-            " in ENGLISH with this exact structure:"
+            "Analyze the attached tender PDF and return a STRICT JSON object in"
+            " ENGLISH with this exact structure:"
         ),
     },
 }
@@ -106,15 +111,7 @@ if uploaded_file is not None:
   if st.button(t["button_text"], type="primary"):
     with st.spinner(t["spinner_text"]):
       try:
-        # 1. Extract PDF text
-        reader = PdfReader(uploaded_file)
-        pdf_text = ""
-        for i, page in enumerate(reader.pages):
-          text = page.extract_text()
-          if text:
-            pdf_text += f"\n--- Page {i+1} ---\n" + text
-
-        # 2. Retrieve API Key
+        # 1. Retrieve API Key
         api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get(
             "GEMINI_API_KEY"
         )
@@ -122,7 +119,10 @@ if uploaded_file is not None:
           st.error(t["error_api_key"])
           st.stop()
 
-        # 3. Direct Gemini API Call via REST
+        # 2. Convert PDF bytes directly to base64 (Zero external dependencies)
+        pdf_bytes = uploaded_file.read()
+        pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+
         prompt = f"""
                 {t["prompt_role"]}
                 
@@ -135,14 +135,22 @@ if uploaded_file is not None:
                   "technical_scoring_criteria": ["Scoring criteria & points distribution / Grille de pointage et éléments notés"],
                   "product_and_environmental_standards": ["EcoLogo, WHMIS/SIMDUT, chemical dispensing & equipment requirements / Normes ÉcoLogo, SIMDUT, dilution et équipements"]
                 }}
-                
-                TENDER TEXT / TEXTE DU DEVIS:
-                {pdf_text[:40000]}
                 """
 
+        # 3. Direct Gemini API Call with native inline PDF support
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
+            "contents": [{
+                "parts": [
+                    {"text": prompt},
+                    {
+                        "inline_data": {
+                            "mime_type": "application/pdf",
+                            "data": pdf_base64,
+                        }
+                    },
+                ]
+            }],
             "generationConfig": {"responseMimeType": "application/json"},
         }
 
