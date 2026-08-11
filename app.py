@@ -103,7 +103,6 @@ t = T[lang]
 
 # ----------------- BULLETPROOF MODEL RUNNER ----------------- #
 def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
-    """Discovers available models and loops through candidates until one succeeds."""
     discovered_models = []
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
@@ -118,10 +117,8 @@ def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
     except Exception:
         pass
 
-    # Sort discovered models newest-first
     discovered_models.sort(reverse=True)
 
-    # Candidate sequence
     candidates = discovered_models + [
         "gemini-2.5-pro",
         "gemini-2.0-flash",
@@ -129,7 +126,6 @@ def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
         "gemini-1.5-flash",
     ]
 
-    # Deduplicate while keeping order
     seen = set()
     candidate_list = []
     for m in candidates:
@@ -165,7 +161,6 @@ def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
                 result = json.loads(response.read().decode("utf-8"))
                 raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
 
-                # Clean potential markdown wrappers
                 if raw_text.startswith("```json"):
                     raw_text = raw_text[7:]
                 if raw_text.startswith("```"):
@@ -198,9 +193,7 @@ if uploaded_file is not None:
         with st.spinner(t["spinner_text"]):
             try:
                 # 1. Retrieve API Key
-                api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get(
-                    "GEMINI_API_KEY"
-                )
+                api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
                 if not api_key:
                     st.error(t["error_api_key"])
                     st.stop()
@@ -219,11 +212,3 @@ if uploaded_file is not None:
                   ],
                   "required_attachments_and_forms": ["List of mandatory forms, bonds, certificates / Liste des formulaires, cautions et attestations"],
                   "technical_scoring_criteria": ["Scoring criteria & points distribution / Grille de pointage et éléments notés"],
-                  "product_and_environmental_standards": ["EcoLogo, WHMIS/SIMDUT, chemical dispensing & equipment requirements / Normes ÉcoLogo, SIMDUT, dilution et équipements"]
-                }}
-                """
-
-                # 3. Process via robust multi-model fallback
-                data = run_gemini_analysis(api_key, prompt, pdf_base64)
-
-                st.success(t["success_text"])
