@@ -100,29 +100,90 @@ T = {
 
 t = T[lang]
 
-# ----------------- HELPER: DYNAMIC MODEL RESOLUTION ----------------- #
-def get_active_model(api_key: str) -> str:
-    """Discovers which models are currently available on this API key."""
+
+# ----------------- BULLETPROOF MODEL RUNNER ----------------- #
+def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
+    """Discovers available models and loops through candidates until one succeeds."""
+    discovered_models = []
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-            models = [
-                m["name"].replace("models/", "")
-                for m in data.get("models", [])
-                if "generateContent" in m.get("supportedGenerationMethods", [])
-            ]
-            
-            # Prefer non-deprecated flash models
-            flash_models = [m for m in models if "flash" in m.lower() and "exp" not in m.lower()]
-            if flash_models:
-                return flash_models[0]
-            if models:
-                return models[0]
+            for m in data.get("models", []):
+                name = m.get("name", "").replace("models/", "")
+                methods = m.get("supportedGenerationMethods", [])
+                if "generateContent" in methods:
+                    discovered_models.append(name)
     except Exception:
         pass
-    return "gemini-1.5-flash-8b"
+
+    # Sort discovered models newest-first
+    discovered_models.sort(reverse=True)
+
+    # Candidate sequence
+    candidates = discovered_models + [
+        "gemini-2.5-pro",
+        "gemini-2.0-flash",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash",
+    ]
+
+    # Deduplicate while keeping order
+    seen = set()
+    candidate_list = []
+    for m in candidates:
+        if m and m not in seen:
+            seen.add(m)
+            candidate_list.append(m)
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": prompt_text},
+                {
+                    "inline_data": {
+                        "mime_type": "application/pdf",
+                        "data": pdf_b64,
+                    }
+                },
+            ]
+        }],
+        "generationConfig": {"responseMimeType": "application/json"},
+    }
+
+    last_error = None
+    for model in candidate_list:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=60) as response:
+                result = json.loads(response.read().decode("utf-8"))
+                raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+                # Clean potential markdown wrappers
+                if raw_text.startswith("```json"):
+                    raw_text = raw_text[7:]
+                if raw_text.startswith("```"):
+                    raw_text = raw_text[3:]
+                if raw_text.endswith("```"):
+                    raw_text = raw_text[:-3]
+
+                return json.loads(raw_text.strip())
+        except urllib.error.HTTPError as e:
+            last_error = e
+            continue
+        except Exception as e:
+            last_error = e
+            continue
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("No compatible active model could be reached.")
 
 
 # ----------------- UI HEADER ----------------- #
@@ -144,10 +205,7 @@ if uploaded_file is not None:
                     st.error(t["error_api_key"])
                     st.stop()
 
-                # 2. Get active model name automatically
-                active_model = get_active_model(api_key)
-
-                # 3. Convert PDF to base64
+                # 2. Convert PDF to base64
                 pdf_bytes = uploaded_file.read()
                 pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
@@ -165,63 +223,7 @@ if uploaded_file is not None:
                 }}
                 """
 
-                # 4. Call the active model
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:generateContent?key={api_key}"
-                payload = {
-                    "contents": [{
-                        "parts": [
-                            {"text": prompt},
-                            {
-                                "inline_data": {
-                                    "mime_type": "application/pdf",
-                                    "data": pdf_base64,
-                                }
-                            },
-                        ]
-                    }],
-                    "generationConfig": {"responseMimeType": "application/json"},
-                }
-
-                req = urllib.request.Request(
-                    url,
-                    data=json.dumps(payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                )
-
-                with urllib.request.urlopen(req) as response:
-                    result = json.loads(response.read().decode("utf-8"))
-                    raw_text = result["candidates"][0]["content"]["parts"][0]["text"]
-                    data = json.loads(raw_text)
+                # 3. Process via robust multi-model fallback
+                data = run_gemini_analysis(api_key, prompt, pdf_base64)
 
                 st.success(t["success_text"])
-
-                # 5. Display Results
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    st.subheader(t["section_mandatory"])
-                    for item in data.get("mandatory_disqualifiers", []):
-                        st.error(
-                            f"**[{item.get('category', t['category_default'])}]**"
-                            f" {item.get('requirement', '')}  \n*{t['impact_label']} :"
-                            f" {item.get('penalty_or_impact', 'Mandatory')}*"
-                        )
-
-                    st.subheader(t["section_forms"])
-                    for form in data.get("required_attachments_and_forms", []):
-                        st.markdown(f"• {form}")
-
-                with col2:
-                    st.subheader(t["section_scoring"])
-                    for score in data.get("technical_scoring_criteria", []):
-                        st.info(f"**Pointage / Scoring:** {score}")
-
-                    st.subheader(t["section_standards"])
-                    for std in data.get("product_and_environmental_standards", []):
-                        st.markdown(f"• {std}")
-
-            except urllib.error.HTTPError as e:
-                error_details = e.read().decode("utf-8")
-                st.error(f"API Error ({e.code}): {error_details}")
-            except Exception as e:
-                st.error(f"{t['error_generic']} {str(e)}")
