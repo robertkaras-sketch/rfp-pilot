@@ -1,6 +1,7 @@
 import json
 import os
-import google.generativeai as genai
+import urllib.error
+import urllib.request
 from pypdf import PdfReader
 import streamlit as st
 
@@ -121,10 +122,7 @@ if uploaded_file is not None:
           st.error(t["error_api_key"])
           st.stop()
 
-        # 3. Configure Gemini
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-
+        # 3. Direct Gemini API Call via REST
         prompt = f"""
                 {t["prompt_role"]}
                 
@@ -142,12 +140,22 @@ if uploaded_file is not None:
                 {pdf_text[:40000]}
                 """
 
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"},
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"},
+        }
+
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
         )
 
-        data = json.loads(response.text)
+        with urllib.request.urlopen(req) as response:
+          result = json.loads(response.read().decode("utf-8"))
+          raw_text = result["candidates"][0]["content"]["parts"][0]["text"]
+          data = json.loads(raw_text)
 
         st.success(t["success_text"])
 
@@ -176,5 +184,8 @@ if uploaded_file is not None:
           for std in data.get("product_and_environmental_standards", []):
             st.markdown(f"• {std}")
 
+      except urllib.error.HTTPError as e:
+        error_details = e.read().decode("utf-8")
+        st.error(f"API Error ({e.code}): {error_details}")
       except Exception as e:
         st.error(f"{t['error_generic']} {str(e)}")
