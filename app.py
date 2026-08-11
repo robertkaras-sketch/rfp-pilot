@@ -1,8 +1,6 @@
 import json
 import os
-from google import genai
-from google.genai import types
-from pydantic import BaseModel, Field
+import google.generativeai as genai
 from pypdf import PdfReader
 import streamlit as st
 
@@ -11,112 +9,94 @@ st.set_page_config(
     page_title="JanSan RFP Engine QC", page_icon="📋", layout="wide"
 )
 
-st.title("📋 Jan/San & Facility Tender Intelligence (Québec / Canada)")
+st.title("📋 Jan/San Tender Intelligence (Québec / Canada)")
 st.caption(
-    "Téléversez un devis ou appel d'offres (SEAO / Corporatif) pour extraire la"
-    " matrice de conformité et critères obligatoires."
+    "Téléversez un devis (SEAO / Corporatif) pour extraire la matrice de"
+    " conformité et les critères obligatoires."
 )
 
-
-# Define Schema
-class ComplianceItem(BaseModel):
-  requirement: str = Field(
-      description="The specific rule, insurance threshold, bond, or condition."
-  )
-  category: str = Field(
-      description=(
-          "Category (e.g., CNESST, Assurance RG, ÉcoLogo/SIMDUT, Décret,"
-          " Expérience)."
-      )
-  )
-  penalty_or_impact: str = Field(
-      description="Rejet automatique / Pénalité / Requis."
-  )
-
-
-class JanSanRfpExtraction(BaseModel):
-  mandatory_disqualifiers: list[ComplianceItem] = Field(
-      description="Critères éliminatoires stricts (pass/fail)."
-  )
-  technical_scoring_criteria: list[str] = Field(
-      description="Grille d'évaluation technique et pointage."
-  )
-  product_and_environmental_standards: list[str] = Field(
-      description=(
-          "Normes ÉcoLogo, SIMDUT/WHMIS, fiches FDS et équipements exigés."
-      )
-  )
-  required_attachments_and_forms: list[str] = Field(
-      description=(
-          "Formulaires, attestations CNESST, cautionnements et annexes requis."
-      )
-  )
-
-
-# Upload box
+# File Uploader
 uploaded_file = st.file_uploader(
-    "Sélectionnez le fichier PDF du devis (RFP)", type=["pdf"]
+    "Sélectionnez le fichier PDF du devis", type=["pdf"]
 )
 
 if uploaded_file is not None:
-  if st.button("Lancer l'analyse du devis / Analyze Tender", type="primary"):
-    # Read PDF text
-    with st.spinner(
-        "Extraction du texte et analyse par l'IA en cours (environ 15"
-        " secondes)..."
-    ):
-      reader = PdfReader(uploaded_file)
-      pdf_text = ""
-      for i, page in enumerate(reader.pages):
-        text = page.extract_text()
-        if text:
-          pdf_text += f"\n--- Page {i+1} ---\n" + text
+  if st.button("Lancer l'analyse du devis", type="primary"):
+    with st.spinner("Analyse du devis en cours... (~15 secondes)"):
+      try:
+        # 1. Extract PDF text
+        reader = PdfReader(uploaded_file)
+        pdf_text = ""
+        for i, page in enumerate(reader.pages):
+          text = page.extract_text()
+          if text:
+            pdf_text += f"\n--- Page {i+1} ---\n" + text
 
-      # Gemini Client
-      client = genai.Client()
+        # 2. Retrieve API Key
+        api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get(
+            "GEMINI_API_KEY"
+        )
+        if not api_key:
+          st.error(
+              "Clé API manquante. Ajoutez GEMINI_API_KEY dans les Secrets"
+              " Streamlit."
+          )
+          st.stop()
 
-      prompt = f"""
-            Tu es un directeur de propositions senior spécialisé dans les appels d'offres d'entretien ménager commercial et d'hygiène/salubrité (Jan/San) au Québec et au Canada (normes SEAO, CNESST, Décret d'entretien d'édifices publics, ÉcoLogo, SIMDUT).
-            Analyse le texte de devis suivant et extrait la matrice de conformité complète en JSON strict.
-            
-            TEXTE DE L'APPEL D'OFFRES:
-            {pdf_text[:40000]}
-            """
+        # 3. Configure Gemini
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.5-flash")
 
-      response = client.models.generate_content(
-          model="gemini-2.5-flash",
-          contents=prompt,
-          config=types.GenerateContentConfig(
-              response_mime_type="application/json",
-              response_schema=JanSanRfpExtraction,
-              temperature=0.1,
-          ),
-      )
+        prompt = f"""
+                Tu es un directeur de propositions senior spécialisé dans les appels d'offres d'entretien ménager commercial et d'hygiène/salubrité (Jan/San) au Québec et au Canada (normes SEAO, CNESST, Décret d'entretien d'édifices publics, ÉcoLogo, SIMDUT).
+                
+                Analyse le texte de devis suivant et retourne un objet JSON STRICT avec cette structure exacte :
+                {{
+                  "mandatory_disqualifiers": [
+                    {{"category": "CNESST / Assurance / etc.", "requirement": "description", "penalty_or_impact": "Rejet automatique"}}
+                  ],
+                  "required_attachments_and_forms": ["Liste des formulaires et attestations requis"],
+                  "technical_scoring_criteria": ["Grille de pointage et éléments notés"],
+                  "product_and_environmental_standards": ["Normes ÉcoLogo, SIMDUT, équipements demandés"]
+                }}
+                
+                TEXTE DE L'APPEL D'OFFRES:
+                {pdf_text[:40000]}
+                """
 
-      data = json.loads(response.text)
-
-    st.success("Analyse terminée avec succès !")
-
-    # Display 2 clean columns
-    col1, col2 = st.columns(2)
-
-    with col1:
-      st.subheader("🚨 Critères éliminatoires & Clauses obligatoires")
-      for item in data.get("mandatory_disqualifiers", []):
-        st.error(
-            f"**[{item['category']}]** {item['requirement']}  \n*Impact :"
-            f" {item['penalty_or_impact']}*"
+        response = model.generate_content(
+            prompt,
+            generation_config={"response_mime_type": "application/json"},
         )
 
-      st.subheader("📎 Formulaires & Annexes à joindre obligatoirement")
-      for form in data.get("required_attachments_and_forms", []):
-        st.markdown(f"• {form}")
+        data = json.loads(response.text)
 
-    with col2:
-      st.subheader("📊 Grille de pointage technique")
-      for score in data.get("technical_scoring_criteria", []):
-        st.info(f"**Pointage :** {score}")
+        st.success("Analyse complétée avec succès !")
 
-      st.subheader("🌱 Normes environnementales & Produits (SIMDUT / ÉcoLogo)")
-      for std in data.get("product_and_environmental_standards", []):
-        st.markdown(f"• {std}")
+        # 4. Render Results
+        col1, col2 = st.columns(2)
+
+        with col1:
+          st.subheader("🚨 Critères éliminatoires")
+          for item in data.get("mandatory_disqualifiers", []):
+            st.error(
+                f"**[{item.get('category', 'Exigence')}]**"
+                f" {item.get('requirement', '')}  \n*Impact :"
+                f" {item.get('penalty_or_impact', 'Requis')}*"
+            )
+
+          st.subheader("📎 Formulaires & Annexes obligatoires")
+          for form in data.get("required_attachments_and_forms", []):
+            st.markdown(f"• {form}")
+
+        with col2:
+          st.subheader("📊 Grille de pointage technique")
+          for score in data.get("technical_scoring_criteria", []):
+            st.info(f"**Pointage :** {score}")
+
+          st.subheader("🌱 Normes environnementales & Produits")
+          for std in data.get("product_and_environmental_standards", []):
+            st.markdown(f"• {std}")
+
+      except Exception as e:
+        st.error(f"Une erreur est survenue lors de l'analyse : {str(e)}")
