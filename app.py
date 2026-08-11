@@ -100,6 +100,31 @@ T = {
 
 t = T[lang]
 
+# ----------------- HELPER: DYNAMIC MODEL RESOLUTION ----------------- #
+def get_active_model(api_key: str) -> str:
+    """Discovers which models are currently available on this API key."""
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            models = [
+                m["name"].replace("models/", "")
+                for m in data.get("models", [])
+                if "generateContent" in m.get("supportedGenerationMethods", [])
+            ]
+            
+            # Prefer non-deprecated flash models
+            flash_models = [m for m in models if "flash" in m.lower() and "exp" not in m.lower()]
+            if flash_models:
+                return flash_models[0]
+            if models:
+                return models[0]
+    except Exception:
+        pass
+    return "gemini-1.5-flash-8b"
+
+
 # ----------------- UI HEADER ----------------- #
 st.title(t["title"])
 st.caption(t["caption"])
@@ -119,7 +144,10 @@ if uploaded_file is not None:
                     st.error(t["error_api_key"])
                     st.stop()
 
-                # 2. Convert PDF to base64
+                # 2. Get active model name automatically
+                active_model = get_active_model(api_key)
+
+                # 3. Convert PDF to base64
                 pdf_bytes = uploaded_file.read()
                 pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
@@ -137,8 +165,8 @@ if uploaded_file is not None:
                 }}
                 """
 
-                # 3. Call Gemini API directly (Zero external package dependencies)
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+                # 4. Call the active model
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:generateContent?key={api_key}"
                 payload = {
                     "contents": [{
                         "parts": [
@@ -167,7 +195,7 @@ if uploaded_file is not None:
 
                 st.success(t["success_text"])
 
-                # 4. Render Results in 2 Columns
+                # 5. Display Results
                 col1, col2 = st.columns(2)
 
                 with col1:
