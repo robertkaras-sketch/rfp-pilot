@@ -1,11 +1,9 @@
 import base64
 import json
 import os
+import urllib.error
+import urllib.request
 import streamlit as st
-
-# We now use the modern, officially supported SDK
-from google import genai
-from google.genai import types
 
 # Page setup
 st.set_page_config(
@@ -121,11 +119,9 @@ if uploaded_file is not None:
                     st.error(t["error_api_key"])
                     st.stop()
 
-                # 2. Initialize the modern GenAI Client
-                client = genai.Client(api_key=api_key)
-
-                # 3. Read PDF data
+                # 2. Convert PDF to base64
                 pdf_bytes = uploaded_file.read()
+                pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
                 prompt = f"""
                 {t["prompt_role"]}
@@ -141,28 +137,37 @@ if uploaded_file is not None:
                 }}
                 """
 
-                # 4. Create the document part for the new API
-                document_part = types.Part.from_bytes(
-                    data=pdf_bytes,
-                    mime_type="application/pdf",
-                )
-                
-                # 5. Call the API using the standard model
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=[document_part, prompt],
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                    ),
+                # 3. Call Gemini API directly (Zero external package dependencies)
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+                payload = {
+                    "contents": [{
+                        "parts": [
+                            {"text": prompt},
+                            {
+                                "inline_data": {
+                                    "mime_type": "application/pdf",
+                                    "data": pdf_base64,
+                                }
+                            },
+                        ]
+                    }],
+                    "generationConfig": {"responseMimeType": "application/json"},
+                }
+
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
                 )
 
-                # Parse the JSON response
-                raw_text = response.text
-                data = json.loads(raw_text)
+                with urllib.request.urlopen(req) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+                    raw_text = result["candidates"][0]["content"]["parts"][0]["text"]
+                    data = json.loads(raw_text)
 
                 st.success(t["success_text"])
 
-                # 6. Render Results in 2 Clean Columns
+                # 4. Render Results in 2 Columns
                 col1, col2 = st.columns(2)
 
                 with col1:
@@ -187,5 +192,8 @@ if uploaded_file is not None:
                     for std in data.get("product_and_environmental_standards", []):
                         st.markdown(f"• {std}")
 
+            except urllib.error.HTTPError as e:
+                error_details = e.read().decode("utf-8")
+                st.error(f"API Error ({e.code}): {error_details}")
             except Exception as e:
                 st.error(f"{t['error_generic']} {str(e)}")
