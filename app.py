@@ -1,9 +1,11 @@
 import base64
 import json
 import os
-import urllib.error
-import urllib.request
 import streamlit as st
+
+# We now use the modern, officially supported SDK
+from google import genai
+from google.genai import types
 
 # Page setup
 st.set_page_config(
@@ -100,32 +102,6 @@ T = {
 
 t = T[lang]
 
-# ----------------- HELPER: AUTO-DETECT WORKING MODEL ----------------- #
-def find_available_model(api_key: str) -> str:
-    """Finds an active, supported Gemini model on the account automatically."""
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-        req = urllib.request.Request(url)
-        with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            available = [
-                m["name"].replace("models/", "")
-                for m in data.get("models", [])
-                if "generateContent" in m.get("supportedGenerationMethods", [])
-                and "gemini" in m.get("name", "").lower()
-            ]
-            # Prioritize fast Flash models first
-            flash_models = [m for m in available if "flash" in m.lower()]
-            if flash_models:
-                return flash_models[0]
-            if available:
-                return available[0]
-    except Exception:
-        pass
-    # Reliable default fallback
-    return "gemini-1.5-flash-latest"
-
-
 # ----------------- UI HEADER ----------------- #
 st.title(t["title"])
 st.caption(t["caption"])
@@ -145,12 +121,11 @@ if uploaded_file is not None:
                     st.error(t["error_api_key"])
                     st.stop()
 
-                # 2. Automatically find the active model
-                model_name = find_available_model(api_key)
+                # 2. Initialize the modern GenAI Client
+                client = genai.Client(api_key=api_key)
 
-                # 3. Convert PDF bytes to base64
+                # 3. Read PDF data
                 pdf_bytes = uploaded_file.read()
-                pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
                 prompt = f"""
                 {t["prompt_role"]}
@@ -166,37 +141,28 @@ if uploaded_file is not None:
                 }}
                 """
 
-                # 4. Direct Gemini API Call with dynamic model name
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-                payload = {
-                    "contents": [{
-                        "parts": [
-                            {"text": prompt},
-                            {
-                                "inline_data": {
-                                    "mime_type": "application/pdf",
-                                    "data": pdf_base64,
-                                }
-                            },
-                        ]
-                    }],
-                    "generationConfig": {"responseMimeType": "application/json"},
-                }
-
-                req = urllib.request.Request(
-                    url,
-                    data=json.dumps(payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
+                # 4. Create the document part for the new API
+                document_part = types.Part.from_bytes(
+                    data=pdf_bytes,
+                    mime_type="application/pdf",
+                )
+                
+                # 5. Call the API using the standard model
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=[document_part, prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                    ),
                 )
 
-                with urllib.request.urlopen(req) as response:
-                    result = json.loads(response.read().decode("utf-8"))
-                    raw_text = result["candidates"][0]["content"]["parts"][0]["text"]
-                    data = json.loads(raw_text)
+                # Parse the JSON response
+                raw_text = response.text
+                data = json.loads(raw_text)
 
                 st.success(t["success_text"])
 
-                # 5. Render Results in 2 Clean Columns
+                # 6. Render Results in 2 Clean Columns
                 col1, col2 = st.columns(2)
 
                 with col1:
@@ -221,8 +187,5 @@ if uploaded_file is not None:
                     for std in data.get("product_and_environmental_standards", []):
                         st.markdown(f"• {std}")
 
-            except urllib.error.HTTPError as e:
-                error_details = e.read().decode("utf-8")
-                st.error(f"API Error ({e.code}): {error_details}")
             except Exception as e:
                 st.error(f"{t['error_generic']} {str(e)}")
