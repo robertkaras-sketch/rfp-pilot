@@ -56,7 +56,7 @@ T = {
         ),
         "prompt_instruction": (
             "Analyse le devis PDF ci-joint et retourne un objet JSON STRICT en"
-            " FRANÇAIS avec cette structure exacte :"
+            " FRANÇAIS respectant cette structure exacte :"
         ),
     },
     "English": {
@@ -93,7 +93,7 @@ T = {
         ),
         "prompt_instruction": (
             "Analyze the attached tender PDF and return a STRICT JSON object in"
-            " ENGLISH with this exact structure:"
+            " ENGLISH matching this exact structure:"
         ),
     },
 }
@@ -202,13 +202,7 @@ if uploaded_file is not None:
                 pdf_bytes = uploaded_file.read()
                 pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
-                prompt = f"""
-                {t["prompt_role"]}
-                
-                {t["prompt_instruction"]}
-                {{
-                  "mandatory_disqualifiers": [
-                    {{"category": "Category / Catégorie", "requirement": "Description", "penalty_or_impact": "Disqualification / Rejet automatique"}}
-                  ],
-                  "required_attachments_and_forms": ["List of mandatory forms, bonds, certificates / Liste des formulaires, cautions et attestations"],
-                  "technical_scoring_criteria": ["Scoring criteria & points distribution / Grille de pointage et éléments notés"],
+                # 3. Build prompt safely without f-string bracket escaping issues
+                schema_template = (
+                    "{\n"
+                    '
