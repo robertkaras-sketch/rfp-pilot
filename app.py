@@ -273,7 +273,8 @@ with tab_prof:
 
     st.markdown(f"**{t['custom_price_h']}**")
     custom_pricing = st.text_area(
-        " ",
+        label="Pricing Details",
+        label_visibility="collapsed",
         value=t["custom_price_val"],
         height=120,
     )
@@ -281,3 +282,6 @@ with tab_prof:
     contractor_profile = {
         "company_name": co_name,
         "company_address": co_addr,
+        "held_certifications": co_certs,
+        "insurance_coverage": co_ins,
+        "bonding_capacity": co_
