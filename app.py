@@ -11,164 +11,235 @@ st.set_page_config(
     layout="wide",
 )
 
-# ----------------- LANGUAGE SELECTION & DICTIONARIES ----------------- #
+# ----------------- SIDEBAR SELECTION ----------------- #
 lang = st.sidebar.radio("🌐 Langue / Language", ("Français", "English"), index=0)
 
+mode_options = {
+    "Français": (
+        "🧹 Services d'entretien ménager (Main-d'oeuvre & Contrats)",
+        "📦 Fournitures, Produits & Équipements (Articles & Catalogue)",
+    ),
+    "English": (
+        "🧹 Jan/San Facility Services (Labor & Service Contracts)",
+        "📦 Jan/San Supplies, Goods & Equipment (Itemized Product Bids)",
+    ),
+}
+
+rfp_mode = st.sidebar.selectbox(
+    "📋 Type de mandat / Mandate Type",
+    mode_options[lang],
+    index=0,
+)
+is_item_mode = "📦" in rfp_mode
+
+# ----------------- TRANSLATION DICTIONARY ----------------- #
 T = {
     "Français": {
-        "title": "🏢 JanSan RFP Pilot — Moteur d'Offres & Générateur de Soumissions",
-        "caption": "Plateforme complète d'analyse d'appels d'offres (SEAO, municipal, corporatif) et de génération de soumissions prêtes à déposer pour entrepreneurs Jan/San.",
-        "tab_profile": "1️⃣ Profil Entreprise & Grille Tarifaire",
+        "title": "🏢 JanSan RFP Pilot — Moteur d'Offres & Soumissions Intelligentes",
+        "caption": "Plateforme d'analyse et de génération de soumissions pour l'industrie Jan/San — Services d'entretien & Fournitures de produits.",
+        "tab_profile": "1️⃣ Profil Entreprise & Grille de Prix",
         "tab_qual": "2️⃣ Qualification & Analyse des Écarts",
         "tab_bid": "3️⃣ Générateur de Soumission Complète",
-        # Tab 1
-        "profile_h": "Identité & Capacités de l'Entreprise",
-        "co_name_lbl": "Raison sociale",
-        "co_name_val": "Services d'Entretien Expert-Net Inc.",
-        "co_addr_lbl": "Adresse & Territoire desservi",
+        # Tab 1 Common
+        "profile_h": "Identité de l'Entreprise & Capacités",
+        "co_name_lbl": "Raison sociale de l'entreprise",
+        "co_name_val": "Distributions & Services Expert-Net Inc.",
+        "co_addr_lbl": "Adresse du siège / Entrepôt principal",
         "co_addr_val": "1500 Boulevard René-Lévesque O, Montréal, QC",
-        "co_certs_lbl": "Certifications & Normes détenues",
-        "co_certs_opts": [
+        "co_ins_lbl": "Assurance responsabilité civile",
+        "co_ins_opts": ["2 000 000 $ CAD", "5 000 000 $ CAD", "10 000 000 $ CAD", "20 000 000 $+ CAD"],
+        # Tab 1 - Services
+        "co_certs_lbl_srv": "Certifications & Normes de service",
+        "co_certs_opts_srv": [
             "ISO 9001 (Système de gestion de la qualité)",
             "ISO 14001 (Gestion environnementale)",
             "CIMS / CIMS-GB (ISSA - Green Building)",
-            "Produits certifiés ÉcoLogo / Green Seal",
             "Attestation CNESST en règle",
             "Attestation Revenu Québec en règle",
             "Licence d'entrepreneur (RBQ)",
             "Personnel avec Enquête de sécurité (Fiabilité/Secret)",
         ],
-        "co_ins_lbl": "Assurance responsabilité civile globale",
-        "co_ins_opts": ["2 000 000 $ CAD", "5 000 000 $ CAD", "10 000 000 $ CAD", "20 000 000 $+ CAD"],
-        "co_bond_lbl": "Capacité de cautionnement (Cautions de soumission / exécution)",
-        "co_bond_opts": [
+        "co_bond_lbl_srv": "Capacité de cautionnement",
+        "co_bond_opts_srv": [
             "Capacité standard (Caution 10% + 50% MO/Matériaux)",
             "Capacité majeure (Cautions 50% / 100%)",
-            "Aucune caution disponible",
+            "Aucune caution requise/disponible",
         ],
-        "pricing_h": "Paramètres Financiers & Grille Tarifaire de Base",
-        "rate_base_lbl": "Taux horaire préposé à l'entretien ($/h)",
-        "rate_super_lbl": "Taux horaire chef d'équipe / superviseur ($/h)",
-        "rate_markup_lbl": "Marge sur produits chimiques & consommables (%)",
-        "custom_price_h": "Grille de prix des travaux périodiques & spécialisés",
-        "custom_price_val": "• Décapage et cirage de planchers vinyle (4 couches): 0.38$/pi²\n• Lavage de vitres intérieur/extérieur: 0.14$/pi²\n• Nettoyage de tapis par extraction à eau chaude: 0.24$/pi²\n• Forfait désinfection électrostatique d'urgence: 450.00$/intervention\n• Taux de main-d'oeuvre d'urgence hors horaire: 48.50$/h",
-        "profile_saved": "✅ Profil maître et grille tarifaire sauvegardés.",
+        "pricing_h_srv": "Grille de Taux Horaires & Frais de Gestion",
+        "rate_base_lbl_srv": "Taux horaire préposé à l'entretien ($/h)",
+        "rate_super_lbl_srv": "Taux horaire chef d'équipe / superviseur ($/h)",
+        "rate_markup_lbl_srv": "Marge sur produits chimiques & consommables (%)",
+        "custom_price_h_srv": "Grille de prix des travaux périodiques & spécialisés",
+        "custom_price_val_srv": "• Décapage et cirage de planchers vinyle (4 couches): 0.38$/pi²\n• Lavage de vitres intérieur/extérieur: 0.14$/pi²\n• Nettoyage de tapis par extraction à eau chaude: 0.24$/pi²\n• Forfait désinfection électrostatique d'urgence: 450.00$/intervention\n• Taux de main-d'oeuvre d'urgence hors horaire: 48.50$/h",
+        # Tab 1 - Items / Supply
+        "co_certs_lbl_itm": "Certifications & Conformité Produits",
+        "co_certs_opts_itm": [
+            "Produits certifiés ÉcoLogo / Green Seal",
+            "Certification FSC (Produits de papier)",
+            "Approbation Santé Canada / DIN (Désinfectants)",
+            "Conformité SIMDUT / FDS conformes et récentes",
+            "Homologation ACIA (Usage agroalimentaire)",
+            "Programme de reprise/recyclage des contenants",
+        ],
+        "logistics_h_itm": "Conditions de Livraison & Logistique",
+        "freight_lbl_itm": "Seuil de commande pour livraison franco (gratuite)",
+        "lead_time_lbl_itm": "Délai de livraison standard",
+        "lead_time_opts_itm": ["24 à 48 heures ouvrables", "Même jour (urgence locale)", "3 à 5 jours ouvrables"],
+        "dispenser_lbl_itm": "Programme de distributrices / Équipements",
+        "dispenser_opts_itm": [
+            "Prêt sans frais (Free-on-loan) avec contrat de fournitures",
+            "Installation et entretien des distributrices inclus",
+            "Vente d'équipements et distributrices seulement",
+        ],
+        "custom_price_h_itm": "Catalogue de Produits & Grille Tarifaire Maître (SKU, Format, Prix)",
+        "custom_price_val_itm": "• Papier hygiénique 2 plis (ÉcoLogo, 48 rl/cs, SKU: PH-200): 38.50$/cs\n• Essuie-mains en rouleau 800 pi (FSC, 6 rl/cs, SKU: EM-800): 42.00$/cs\n• Nettoyant tout-usage concentré ÉcoLogo (4x4L, SKU: CH-101): 48.00$/cs\n• Désinfectant hospitalier virucide DIN (12x1L, SKU: DS-500): 62.00$/cs\n• Sacs à déchets réguliers 35x50 (Recyclé, 200/cs, SKU: SC-3550): 32.50$/cs\n• Savon à mains mousse certifié Éco (4x1000ml, SKU: SV-100): 44.00$/cs",
+        "profile_saved": "✅ Profil maître et paramètres sauvegardés.",
         # Side uploader
-        "upload_h": "Devis de l'Appel d'Offres (PDF)",
-        "upload_lbl": "Téléversez le devis officiel (SEAO, Buyandsell, devis privé)",
-        "no_pdf_qual": "👈 Veuillez d'abord téléverser un fichier PDF d'appel d'offres dans le panneau latéral gauche.",
-        "no_pdf_bid": "👈 Veuillez téléverser le devis PDF dans la barre latérale pour générer la soumission complète.",
+        "upload_h": "Document d'Appel d'Offres (PDF)",
+        "upload_lbl": "Téléversez le devis officiel (SEAO, AchatsCan, municipal, privé)",
+        "no_pdf_qual": "👈 Veuillez téléverser un fichier PDF d'appel d'offres dans la barre latérale gauche.",
+        "no_pdf_bid": "👈 Veuillez d'abord téléverser le document PDF pour générer la soumission.",
         # Tab 2
         "btn_qual": "1. Analyser la Conformité & Risques (Go / No-Go)",
-        "spinner_qual": "Évaluation de la conformité et analyse des écarts en cours...",
-        "verdict_lbl": "Décision",
+        "spinner_qual": "Analyse du devis en cours...",
+        "verdict_lbl": "Décision Recommandée",
         "score_lbl": "Score d'adéquation",
-        "gaps_h": "⚠️ Analyse des Écarts & Risques",
-        "mandatory_h": "🚨 Critères Éliminatoires (Pass / Fail)",
-        "forms_h": "📎 Formulaires & Cautions Obligatoires",
-        "scoring_h": "📊 Grille d'Évaluation & Points",
+        "gaps_h": "⚠️ Analyse des Écarts & Produits Manquants",
+        "mandatory_h": "🚨 Critères d'Exclusion / Exigences Obligatoires",
+        "forms_h": "📎 Formulaires & Fiches Techniques (FDS/TDS) Requis",
+        "scoring_h": "📊 Grille de Pointage & Pondération",
         "req_lbl": "Exigence",
         "reject_lbl": "Rejet",
         # Tab 3
-        "bid_desc": "Générez automatiquement l'ensemble de la soumission prête à être déposée, incluant le calcul des coûts, le plan de travail, les normes et la lettre de présentation.",
+        "bid_desc_srv": "Génère une proposition de service complète, chiffrée selon les superficies et fréquences, avec plan de travail et lettre de transmission.",
+        "bid_desc_itm": "Génère une offre de fournitures complète avec tableau de correspondance des articles (SKU, équivalences, prix unitaires), plan logistique et engagements FDS/Éco.",
         "btn_bid": "2. Générer la Proposition Complète de Soumission",
-        "spinner_bid": "Rédaction et calcul de la soumission complète en cours...",
+        "spinner_bid": "Génération de la soumission complète en cours...",
         "exp_letter": "📄 Lettre Formelle de Soumission (Transmittal Letter)",
-        "exp_scope": "🏢 Compréhension du Mandat & Envergure des Travaux",
-        "exp_price": "💰 Grille Financière & Chiffrage de l'Offre",
-        "metric_monthly": "Entretien Régulier (Mensuel)",
-        "metric_annual": "Entretien Régulier (Annuel)",
-        "metric_total": "Valeur Totale Année 1",
-        "periodic_breakdown_h": "Détail des travaux périodiques & spécialisés calculés :",
-        "exp_ops": "🛠️ Plan Opérationnel, Supervision & Contrôle Qualité",
-        "exp_env": "🌱 Plan Environnemental, SIMDUT & Santé-Sécurité",
-        "download_btn": "📥 Télécharger la Soumission Complète (.md)",
+        "exp_scope_srv": "🏢 Compréhension du Mandat & Envergure des Travaux",
+        "exp_scope_itm": "📦 Compréhension des Besoins d'Approvisionnement & Gamme Proposée",
+        "exp_price_srv": "💰 Grille Financière & Chiffrage de l'Offre",
+        "exp_price_itm": "💰 Bordereau des Prix & Table de Correspondance des Articles",
+        "metric_srv_monthly": "Entretien Régulier (Mensuel)",
+        "metric_srv_annual": "Entretien Régulier (Annuel)",
+        "metric_srv_total": "Valeur Totale Année 1",
+        "metric_itm_items": "Nombre d'articles chiffrés",
+        "metric_itm_lead": "Délai moyen de livraison",
+        "metric_itm_freight": "Seuil de livraison franco",
+        "exp_ops_srv": "🛠️ Plan Opérationnel, Supervision & Contrôle Qualité",
+        "exp_ops_itm": "🚚 Logistique, Entreposage, SLA & Gestion des Ruptures",
+        "exp_env_srv": "🌱 Plan Environnemental, SIMDUT & Santé-Sécurité",
+        "exp_env_itm": "🌱 Fiches Techniques, FDS, Éco-certifications & Distributrices",
+        "download_btn": "📥 Télécharger la Soumission (.md)",
         "file_prefix": "Soumission",
-        # Prompts & Schemas
-        "prompt_role_qual": "Tu es un directeur de propositions sénior et un auditeur d'appels d'offres d'entretien ménager (Jan/San) au Québec/Canada.",
-        "prompt_role_bid": "Tu es un directeur de propositions sénior en hygiène et salubrité (Jan/San) au Québec/Canada. Rédige une PROPOSITION COMPLÈTE, FORMELLE ET CHIFFRÉE DE SOUMISSION prête à être soumise au donneur d'ouvrage en français. Applique rigoureusement les taux horaires et les prix au pi² du contracteur ci-dessous aux superficies et fréquences du devis PDF.",
-        "err_key": "Clé API manquante. Ajoutez GEMINI_API_KEY dans les Secrets Streamlit.",
+        "err_key": "Clé API introuvable. Veuillez configurer GEMINI_API_KEY dans les Secrets Streamlit.",
     },
     "English": {
-        "title": "🏢 JanSan RFP Pilot — Bid Intelligence & Complete Proposal Engine",
-        "caption": "Complete tender analysis platform (Buyandsell, MERX, municipal, corporate) and automated submission proposal generator for Jan/San contractors.",
+        "title": "🏢 JanSan RFP Pilot — Proposal Engine & Tender Intelligence",
+        "caption": "Tender analysis and automated proposal generator for the Jan/San industry — Facility Cleaning Services & Product Supply Bids.",
         "tab_profile": "1️⃣ Master Profile & Price Matrix",
         "tab_qual": "2️⃣ Qualification & Gap Matrix",
         "tab_bid": "3️⃣ Complete Bid Proposal Generator",
-        # Tab 1
+        # Tab 1 Common
         "profile_h": "Contractor Credentials & Qualifications",
         "co_name_lbl": "Company Legal Name",
-        "co_name_val": "Expert-Clean Facility Services Inc.",
-        "co_addr_lbl": "Headquarters Address & Service Territory",
+        "co_name_val": "Expert-Clean Supply & Facility Solutions Inc.",
+        "co_addr_lbl": "Headquarters / Main Distribution Center Address",
         "co_addr_val": "1500 Rene-Levesque Blvd W, Montreal, QC",
-        "co_certs_lbl": "Certifications & Accreditations Held",
-        "co_certs_opts": [
+        "co_ins_lbl": "Commercial General Liability Insurance",
+        "co_ins_opts": ["$2,000,000 CAD", "$5,000,000 CAD", "$10,000,000 CAD", "$20,000,000+ CAD"],
+        # Tab 1 - Services
+        "co_certs_lbl_srv": "Cleaning & Service Certifications Held",
+        "co_certs_opts_srv": [
             "ISO 9001 (Quality Management System)",
             "ISO 14001 (Environmental Management)",
             "CIMS / CIMS-GB (ISSA - Green Building)",
-            "EcoLogo / Green Seal Certified Products",
             "WSIB / CNESST Clearance Certificate",
-            "Good Standing Tax Certificates (Provincial & Federal)",
+            "Good Standing Tax Certificates",
             "Valid General Cleaning / Contractor License",
             "Security-Cleared Staff (Reliability / Secret)",
         ],
-        "co_ins_lbl": "Commercial General Liability Insurance",
-        "co_ins_opts": ["$2,000,000 CAD", "$5,000,000 CAD", "$10,000,000 CAD", "$20,000,000+ CAD"],
-        "co_bond_lbl": "Bonding Capacity (Bid Bonds / Performance Surety)",
-        "co_bond_opts": [
+        "co_bond_lbl_srv": "Bonding Capacity (Surety Bonds)",
+        "co_bond_opts_srv": [
             "Standard Capacity (10% Bid Bond + 50% Labor/Materials)",
             "Major Capacity (50% / 100% Performance Bonds)",
-            "No Surety / Bonding Available",
+            "No Surety / Bonding Required",
         ],
-        "pricing_h": "Financial Multipliers & Base Rate Matrix",
-        "rate_base_lbl": "Base Cleaner Hourly Billing Rate ($/hr)",
-        "rate_super_lbl": "Supervisor / Team Lead Hourly Billing Rate ($/hr)",
-        "rate_markup_lbl": "Chemical & Supply Markup (%)",
-        "custom_price_h": "Periodic & Specialty Services Price List",
-        "custom_price_val": "• VCT Strip & Wax (4 coats premium finish): $0.38/sq ft\n• Interior & Exterior Window Washing: $0.14/sq ft\n• Hot Water Extraction Carpet Cleaning: $0.24/sq ft\n• Emergency Electrostatic Disinfection Package: $450.00/call\n• After-hours Emergency Dispatch Rate: $48.50/hr",
-        "profile_saved": "✅ Master profile and price list saved successfully.",
+        "pricing_h_srv": "Hourly Billing Rates & Management Fees",
+        "rate_base_lbl_srv": "Base Cleaner Hourly Billing Rate ($/hr)",
+        "rate_super_lbl_srv": "Supervisor / Team Lead Hourly Billing Rate ($/hr)",
+        "rate_markup_lbl_srv": "Chemical & Supply Markup (%)",
+        "custom_price_h_srv": "Periodic & Specialty Services Price List",
+        "custom_price_val_srv": "• VCT Strip & Wax (4 coats premium finish): $0.38/sq ft\n• Interior & Exterior Window Washing: $0.14/sq ft\n• Hot Water Extraction Carpet Cleaning: $0.24/sq ft\n• Emergency Electrostatic Disinfection Package: $450.00/call\n• After-hours Emergency Dispatch Rate: $48.50/hr",
+        # Tab 1 - Items / Supply
+        "co_certs_lbl_itm": "Product Certifications & Environmental Accreditations",
+        "co_certs_opts_itm": [
+            "EcoLogo / Green Seal Certified Formulations",
+            "FSC / SFI Certified Recycled Paper Products",
+            "Health Canada DIN Registration (Disinfectants)",
+            "WHMIS 2015 Compliant SDS Library Available",
+            "CFIA / Food Contact Approved",
+            "Zero-Waste Drum Return / Recycling Program",
+        ],
+        "logistics_h_itm": "Supply Chain & Delivery Terms",
+        "freight_lbl_itm": "Prepaid Freight Order Threshold (Free Delivery)",
+        "lead_time_lbl_itm": "Standard Order Delivery SLA",
+        "lead_time_opts_itm": ["24 to 48 business hours", "Same-day emergency dispatch", "3 to 5 business days"],
+        "dispenser_lbl_itm": "Dispenser & Equipment Program",
+        "dispenser_opts_itm": [
+            "Free-on-loan (FRO) dispenser placement with supply agreement",
+            "Full installation and routine dispenser maintenance included",
+            "Equipment sale and drop-ship only",
+        ],
+        "custom_price_h_itm": "Master Product Catalog & Unit Price Matrix (SKU, Pack Size, Price)",
+        "custom_price_val_itm": "• 2-Ply Standard Bath Tissue (EcoLogo, 48 rls/cs, SKU: BT-200): $38.50/cs\n• Hardwound Roll Towel 800' (FSC, 6 rls/cs, SKU: RT-800): $42.00/cs\n• Neutral Multi-Surface Cleaner Concentrate (4x4L, SKU: CH-101): $48.00/cs\n• Broad-Spectrum Disinfectant DIN (12x1L, SKU: DS-500): $62.00/cs\n• Heavy Duty Trash Liners 35x50 (Recycled, 200/cs, SKU: BG-3550): $32.50/cs\n• Luxury Foam Hand Soap Eco-Certified (4x1000ml, SKU: SP-100): $44.00/cs",
+        "profile_saved": "✅ Master profile and settings saved successfully.",
         # Side uploader
         "upload_h": "Tender / RFP Document (PDF)",
-        "upload_lbl": "Upload official RFP document (Buyandsell, MERX, SEAO, Corporate)",
+        "upload_lbl": "Upload official RFP (Buyandsell, MERX, SEAO, Municipal, Corporate)",
         "no_pdf_qual": "👈 Please first upload a tender PDF document in the left sidebar.",
-        "no_pdf_bid": "👈 Please upload the tender PDF in the sidebar to generate the complete proposal.",
+        "no_pdf_bid": "👈 Please upload the tender PDF in the sidebar to generate the proposal.",
         # Tab 2
         "btn_qual": "1. Analyze Compliance & Gap Risks (Go / No-Go)",
-        "spinner_qual": "Evaluating tender compliance against contractor credentials...",
-        "verdict_lbl": "Verdict",
+        "spinner_qual": "Evaluating tender compliance...",
+        "verdict_lbl": "Recommended Verdict",
         "score_lbl": "Suitability Score",
-        "gaps_h": "⚠️ Gap Analysis & Compliance Risks",
-        "mandatory_h": "🚨 Mandatory Disqualifiers (Pass / Fail)",
-        "forms_h": "📎 Mandatory Forms, Bonds & Schedules",
-        "scoring_h": "📊 Evaluation Grid & Points Breakdown",
+        "gaps_h": "⚠️ Product / Capability Gaps & Non-Compliance",
+        "mandatory_h": "🚨 Mandatory Disqualifiers & Critical Specs",
+        "forms_h": "📎 Mandatory Forms, SDS & Schedules Required",
+        "scoring_h": "📊 Evaluation Grid & Points Weighting",
         "req_lbl": "Requirement",
         "reject_lbl": "Rejection",
         # Tab 3
-        "bid_desc": "Automatically generate the complete, submission-ready proposal package including calculated pricing schedules, methodology, quality control, WHMIS/Eco compliance, and transmittal letter.",
+        "bid_desc_srv": "Generates a complete cleaning proposal based on square footage and frequencies, including operational staffing and transmittal letter.",
+        "bid_desc_itm": "Generates a complete Jan/San item supply proposal with product equivalency tables, case pack pricing, logistics SLA, and SDS/Eco commitments.",
         "btn_bid": "2. Generate Complete Submission Proposal",
-        "spinner_bid": "Drafting complete itemized proposal and pricing schedules in English...",
+        "spinner_bid": "Drafting complete itemized submission proposal...",
         "exp_letter": "📄 Formal Transmittal & Submission Letter",
-        "exp_scope": "🏢 Understanding of Mandate & Scope of Work",
-        "exp_price": "💰 Calculated Pricing & Financial Breakdown",
-        "metric_monthly": "Routine Cleaning (Monthly)",
-        "metric_annual": "Routine Cleaning (Annual)",
-        "metric_total": "Total Year 1 Contract Value",
-        "periodic_breakdown_h": "Calculated Periodic & Specialty Service Schedule:",
-        "exp_ops": "🛠️ Operational Plan, Supervision & Quality Assurance",
-        "exp_env": "🌱 Environmental Plan, WHMIS & Health-Safety",
+        "exp_scope_srv": "🏢 Understanding of Mandate & Scope of Work",
+        "exp_scope_itm": "📦 Understanding of Supply Requirements & Offered Line-Up",
+        "exp_price_srv": "💰 Calculated Pricing & Financial Breakdown",
+        "exp_price_itm": "💰 Itemized Pricing Schedule & Product Cross-Reference",
+        "metric_srv_monthly": "Routine Cleaning (Monthly)",
+        "metric_srv_annual": "Routine Cleaning (Annual)",
+        "metric_srv_total": "Total Year 1 Contract Value",
+        "metric_itm_items": "Quoted Line Items",
+        "metric_itm_lead": "Standard Lead Time",
+        "metric_itm_freight": "Free Freight Threshold",
+        "exp_ops_srv": "🛠️ Operational Plan, Supervision & Quality Assurance",
+        "exp_ops_itm": "🚚 Supply Chain Logistics, Warehousing & Backorder SLA",
+        "exp_env_srv": "🌱 Environmental Plan, WHMIS & Health-Safety",
+        "exp_env_itm": "🌱 Eco-Certifications, SDS Sheets & Dispenser Programs",
         "download_btn": "📥 Download Complete Bid Proposal (.md)",
         "file_prefix": "Bid_Proposal",
-        # Prompts & Schemas
-        "prompt_role_qual": "You are a senior proposal director and procurement evaluator for commercial cleaning and Jan/San tenders across Canada.",
-        "prompt_role_bid": "You are a senior proposal director in facility hygiene and Jan/San procurement. Write a COMPLETE, FORMAL, AND ITEMIZED SUBMISSION PROPOSAL ready to submit to the client in English. Rigorously apply the contractor's hourly rates and sq ft pricing below to the tender's square footage and frequencies.",
-        "err_key": "Missing API key. Please add GEMINI_API_KEY in Streamlit Secrets.",
+        "err_key": "Missing API key. Please configure GEMINI_API_KEY in Streamlit Secrets.",
     },
 }
 
 t = T[lang]
 
 
-# ----------------- BULLETPROOF MODEL RUNNER ----------------- #
+# ----------------- BULLETPROOF GEMINI RUNNER ----------------- #
 def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
     discovered_models = []
     try:
@@ -245,55 +316,99 @@ st.caption(t["caption"])
 
 tab_prof, tab_qual, tab_bid = st.tabs([t["tab_profile"], t["tab_qual"], t["tab_bid"]])
 
-# ----------------- TAB 1: MASTER CONTRACTOR PROFILE ----------------- #
+# ----------------- TAB 1: MASTER CONTRACTOR / DISTRIBUTOR PROFILE ----------------- #
 with tab_prof:
     st.subheader(t["profile_h"])
     col1, col2 = st.columns(2)
     with col1:
         co_name = st.text_input(t["co_name_lbl"], value=t["co_name_val"])
         co_addr = st.text_input(t["co_addr_lbl"], value=t["co_addr_val"])
-        co_certs = st.multiselect(
-            t["co_certs_lbl"],
-            t["co_certs_opts"],
-            default=[t["co_certs_opts"][0], t["co_certs_opts"][3], t["co_certs_opts"][4]],
-        )
+
     with col2:
         co_ins = st.selectbox(t["co_ins_lbl"], t["co_ins_opts"], index=1)
-        co_bond = st.selectbox(t["co_bond_lbl"], t["co_bond_opts"], index=0)
 
     st.markdown("---")
-    st.subheader(t["pricing_h"])
-    pcol1, pcol2, pcol3 = st.columns(3)
-    with pcol1:
-        rate_base = st.number_input(t["rate_base_lbl"], min_value=15.0, max_value=200.0, value=29.50, step=0.50)
-    with pcol2:
-        rate_super = st.number_input(t["rate_super_lbl"], min_value=20.0, max_value=250.0, value=38.00, step=0.50)
-    with pcol3:
-        rate_markup = st.number_input(t["rate_markup_lbl"], min_value=0.0, max_value=100.0, value=15.0, step=1.0)
 
-    st.markdown(f"**{t['custom_price_h']}**")
-    custom_pricing = st.text_area(
-        label="Pricing Details",
-        label_visibility="collapsed",
-        value=t["custom_price_val"],
-        height=120,
-    )
+    if not is_item_mode:
+        # SERVICES MODE
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            co_certs = st.multiselect(
+                t["co_certs_lbl_srv"],
+                t["co_certs_opts_srv"],
+                default=[t["co_certs_opts_srv"][0], t["co_certs_opts_srv"][3]],
+            )
+        with col_s2:
+            co_bond = st.selectbox(t["co_bond_lbl_srv"], t["co_bond_opts_srv"], index=0)
 
-    contractor_profile = {
-        "company_name": co_name,
-        "company_address": co_addr,
-        "held_certifications": co_certs,
-        "insurance_coverage": co_ins,
-        "bonding_capacity": co_bond,
-        "base_cleaner_rate": f"${rate_base}/hr",
-        "supervisor_rate": f"${rate_super}/hr",
-        "chemical_markup": f"{rate_markup}%",
-        "itemized_price_list": custom_pricing,
-    }
+        st.subheader(t["pricing_h_srv"])
+        pcol1, pcol2, pcol3 = st.columns(3)
+        with pcol1:
+            rate_base = st.number_input(t["rate_base_lbl_srv"], min_value=15.0, max_value=200.0, value=29.50, step=0.50)
+        with pcol2:
+            rate_super = st.number_input(t["rate_super_lbl_srv"], min_value=20.0, max_value=250.0, value=38.00, step=0.50)
+        with pcol3:
+            rate_markup = st.number_input(t["rate_markup_lbl_srv"], min_value=0.0, max_value=100.0, value=15.0, step=1.0)
+
+        st.markdown(f"**{t['custom_price_h_srv']}**")
+        custom_pricing = st.text_area(
+            label="Service Pricing Matrix",
+            label_visibility="collapsed",
+            value=t["custom_price_val_srv"],
+            height=120,
+        )
+
+        contractor_profile = {
+            "mandate_type": "Facility Cleaning Services",
+            "company_name": co_name,
+            "company_address": co_addr,
+            "insurance_coverage": co_ins,
+            "certifications": co_certs,
+            "bonding_capacity": co_bond,
+            "base_cleaner_rate": f"${rate_base}/hr",
+            "supervisor_rate": f"${rate_super}/hr",
+            "chemical_markup": f"{rate_markup}%",
+            "specialty_price_matrix": custom_pricing,
+        }
+
+    else:
+        # GOODS / ITEM SUPPLY MODE
+        col_i1, col_i2 = st.columns(2)
+        with col_i1:
+            co_certs = st.multiselect(
+                t["co_certs_lbl_itm"],
+                t["co_certs_opts_itm"],
+                default=[t["co_certs_opts_itm"][0], t["co_certs_opts_itm"][1], t["co_certs_opts_itm"][3]],
+            )
+            dispenser_prog = st.selectbox(t["dispenser_lbl_itm"], t["dispenser_opts_itm"], index=0)
+        with col_i2:
+            freight_threshold = st.text_input(t["freight_lbl_itm"], value="$250.00 CAD")
+            lead_time = st.selectbox(t["lead_time_lbl_itm"], t["lead_time_opts_itm"], index=0)
+
+        st.subheader(t["custom_price_h_itm"])
+        custom_catalog = st.text_area(
+            label="Product Catalog Matrix",
+            label_visibility="collapsed",
+            value=t["custom_price_val_itm"],
+            height=150,
+        )
+
+        contractor_profile = {
+            "mandate_type": "Jan/San Goods & Item Supply",
+            "company_name": co_name,
+            "company_address": co_addr,
+            "insurance_coverage": co_ins,
+            "product_certifications": co_certs,
+            "dispenser_program": dispenser_prog,
+            "free_freight_threshold": freight_threshold,
+            "delivery_lead_time": lead_time,
+            "master_catalog_price_list": custom_catalog,
+        }
+
     st.session_state["contractor_profile"] = contractor_profile
     st.success(t["profile_saved"])
 
-# ----------------- SHARED UPLOADER ----------------- #
+# ----------------- SIDEBAR UPLOADER ----------------- #
 st.sidebar.markdown("---")
 st.sidebar.subheader(t["upload_h"])
 uploaded_pdf = st.sidebar.file_uploader(t["upload_lbl"], type=["pdf"])
@@ -318,10 +433,10 @@ with tab_qual:
                         "go_no_go_verdict": {
                             "decision": "GO / CONDITIONAL GO / NO-GO",
                             "suitability_score": "88%",
-                            "executive_rationale": "Rationale explaining why this bid is or isn't a fit.",
+                            "executive_rationale": "Clear rationale explaining whether the contractor/distributor meets the tender requirements.",
                         },
                         "gap_analysis_missing_requirements": [
-                            "Specific certification, experience threshold, or insurance limit required that contractor lacks."
+                            "Specific product spec, certification, missing SKU, or delivery term requirement that may present risk."
                         ],
                         "mandatory_disqualifiers": [
                             {
@@ -331,17 +446,28 @@ with tab_qual:
                             }
                         ],
                         "required_annexes_and_forms": [
-                            "Mandatory submission schedules, security forms, and bid bonds to include."
+                            "Mandatory schedules, technical data sheets (TDS), SDS sheets, or surety forms to be attached."
                         ],
                         "scoring_matrix_summary": [
-                            "Point distribution breakdown for technical scoring and pricing."
+                            "Points weighting and criteria breakdown for technical score vs. pricing."
                         ],
                     }
 
+                    if is_item_mode:
+                        role_qual = (
+                            f"You are a senior procurement auditor specializing in Jan/San product supply, institutional consumable goods, and equipment tenders in Canada. "
+                            f"Analyze the attached tender PDF against the vendor's catalog and logistics capabilities in {lang}."
+                        )
+                    else:
+                        role_qual = (
+                            f"You are a senior proposal auditor specializing in commercial cleaning, building maintenance, and Jan/San service tenders in Canada. "
+                            f"Analyze the attached tender PDF against the contractor's credentials and pricing in {lang}."
+                        )
+
                     prompt = (
-                        f"{t['prompt_role_qual']}\n\n"
-                        f"CONTRACTOR PROFILE & PRICE LIST:\n{json.dumps(contractor_profile, ensure_ascii=False, indent=2)}\n\n"
-                        f"Analyze the attached RFP PDF against the contractor's profile. Return a STRICT JSON object in {lang} matching this structure:\n"
+                        f"{role_qual}\n\n"
+                        f"VENDOR / CONTRACTOR MASTER PROFILE:\n{json.dumps(contractor_profile, ensure_ascii=False, indent=2)}\n\n"
+                        f"Return a STRICT JSON object matching this structure in {lang}:\n"
                         f"{json.dumps(schema_qual, indent=2)}"
                     )
 
@@ -374,135 +500,3 @@ with tab_qual:
 
                 st.subheader(t["scoring_h"])
                 for s in qdata.get("scoring_matrix_summary", []):
-                    st.markdown(f"• {s}")
-
-# ----------------- TAB 3: COMPLETE BID PROPOSAL GENERATOR ----------------- #
-with tab_bid:
-    if uploaded_pdf is None:
-        st.info(t["no_pdf_bid"])
-    else:
-        st.write(t["bid_desc"])
-        if st.button(t["btn_bid"], type="primary"):
-            with st.spinner(t["spinner_bid"]):
-                try:
-                    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-                    if not api_key:
-                        st.error(t["err_key"])
-                        st.stop()
-
-                    uploaded_pdf.seek(0)
-                    pdf_bytes = uploaded_pdf.read()
-                    pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
-
-                    schema_bid = {
-                        "proposal_title": "Full formal title of the submission proposal",
-                        "transmittal_letter": "Complete formal transmittal cover letter addressed to the issuing client, signed on behalf of the contractor.",
-                        "executive_summary_scope": "Comprehensive understanding of the mandate, facility square footage, operating hours, frequencies, and standards.",
-                        "calculated_pricing_table": {
-                            "routine_cleaning_monthly": "$X,XXX.XX CAD",
-                            "routine_cleaning_annual": "$XX,XXX.XX CAD",
-                            "periodic_services_breakdown": [
-                                "Detailed periodic task (e.g. strip & wax, windows), frequency, applied unit rate based on contractor's price list"
-                            ],
-                            "total_first_year_contract_value": "$XXX,XXX.XX CAD",
-                        },
-                        "operational_plan_and_staffing": "Staffing plan, supervisor-to-cleaner ratios, shift schedules, inspection workflows, and QA logbook protocol.",
-                        "environmental_and_safety_commitments": "WHMIS/SIMDUT compliance plan, SDS availability, EcoLogo chemical commitments, HEPA equipment standard.",
-                        "compliance_guarantees": "Formal declarations of compliance with labor decrees, CNESST/WSIB, and requested insurance coverage.",
-                    }
-
-                    prompt_bid = (
-                        f"{t['prompt_role_bid']}\n\n"
-                        f"CONTRACTOR PROFILE & PRICE LIST:\n{json.dumps(contractor_profile, ensure_ascii=False, indent=2)}\n\n"
-                        f"Write the entire proposal in {lang}. Return a STRICT JSON object matching this structure:\n"
-                        f"{json.dumps(schema_bid, indent=2)}"
-                    )
-
-                    bid_data = run_gemini_analysis(api_key, prompt_bid, pdf_base64)
-                    st.session_state["bid_data"] = bid_data
-
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
-
-        if "bid_data" in st.session_state:
-            b = st.session_state["bid_data"]
-            st.markdown(f"## {b.get('proposal_title', 'Proposal Document')}")
-
-            # 1. Submission Letter
-            with st.expander(t["exp_letter"], expanded=True):
-                st.markdown(b.get("transmittal_letter", ""))
-
-            # 2. Executive Scope
-            with st.expander(t["exp_scope"], expanded=True):
-                st.markdown(b.get("executive_summary_scope", ""))
-
-            # 3. Calculated Pricing Schedule
-            with st.expander(t["exp_price"], expanded=True):
-                ptable = b.get("calculated_pricing_table", {})
-                m1, m2, m3 = st.columns(3)
-                m1.metric(t["metric_monthly"], ptable.get("routine_cleaning_monthly", "N/A"))
-                m2.metric(t["metric_annual"], ptable.get("routine_cleaning_annual", "N/A"))
-                m3.metric(t["metric_total"], ptable.get("total_first_year_contract_value", "N/A"))
-
-                st.markdown(f"#### {t['periodic_breakdown_h']}")
-                for s_item in ptable.get("periodic_services_breakdown", []):
-                    st.markdown(f"• {s_item}")
-
-            # 4. Operations & Quality Control
-            with st.expander(t["exp_ops"], expanded=False):
-                st.markdown(b.get("operational_plan_and_staffing", ""))
-
-            # 5. Environmental & Safety Standards
-            with st.expander(t["exp_env"], expanded=False):
-                st.markdown(b.get("environmental_and_safety_commitments", ""))
-                st.markdown("---")
-                st.markdown(b.get("compliance_guarantees", ""))
-
-            # Format periodic list for download
-            periodic_list_raw = ptable.get("periodic_services_breakdown", [])
-            periodic_items_formatted = "\n".join([f"- {item}" for item in periodic_list_raw])
-
-            # Download compiled document
-            if lang == "English":
-                compiled_md = (
-                    f"# {b.get('proposal_title', 'Commercial Bid Proposal')}\n\n"
-                    f"## 1. Formal Transmittal Cover Letter\n{b.get('transmittal_letter', '')}\n\n"
-                    f"---\n\n"
-                    f"## 2. Understanding of Mandate & Scope of Work\n{b.get('executive_summary_scope', '')}\n\n"
-                    f"---\n\n"
-                    f"## 3. Financial Summary & Pricing Schedule\n"
-                    f"- **Routine Cleaning (Monthly):** {ptable.get('routine_cleaning_monthly', 'N/A')}\n"
-                    f"- **Routine Cleaning (Annual):** {ptable.get('routine_cleaning_annual', 'N/A')}\n"
-                    f"- **Total Estimated First-Year Value:** {ptable.get('total_first_year_contract_value', 'N/A')}\n\n"
-                    f"### Periodic & Specialty Service Schedule:\n{periodic_items_formatted}\n\n"
-                    f"---\n\n"
-                    f"## 4. Operational Plan, Supervision & Quality Assurance\n{b.get('operational_plan_and_staffing', '')}\n\n"
-                    f"---\n\n"
-                    f"## 5. Environmental Standards, WHMIS & Safety Guarantees\n{b.get('environmental_and_safety_commitments', '')}\n\n"
-                    f"{b.get('compliance_guarantees', '')}\n"
-                )
-            else:
-                compiled_md = (
-                    f"# {b.get('proposal_title', 'Proposition de Soumission')}\n\n"
-                    f"## 1. Lettre de Transmission\n{b.get('transmittal_letter', '')}\n\n"
-                    f"---\n\n"
-                    f"## 2. Compréhension du Mandat & Portée des Travaux\n{b.get('executive_summary_scope', '')}\n\n"
-                    f"---\n\n"
-                    f"## 3. Sommaire Financier & Grille Tarifaire\n"
-                    f"- **Entretien régulier mensuel :** {ptable.get('routine_cleaning_monthly', 'N/A')}\n"
-                    f"- **Entretien régulier annuel :** {ptable.get('routine_cleaning_annual', 'N/A')}\n"
-                    f"- **Valeur contractuelle totale estimée (Année 1) :** {ptable.get('total_first_year_contract_value', 'N/A')}\n\n"
-                    f"### Travaux périodiques et spécialisés :\n{periodic_items_formatted}\n\n"
-                    f"---\n\n"
-                    f"## 4. Plan Opérationnel, Supervision & Assurance Qualité\n{b.get('operational_plan_and_staffing', '')}\n\n"
-                    f"---\n\n"
-                    f"## 5. Normes Environnementales, SIMDUT et Santé-Sécurité\n{b.get('environmental_and_safety_commitments', '')}\n\n"
-                    f"{b.get('compliance_guarantees', '')}\n"
-                )
-
-            st.download_button(
-                label=t["download_btn"],
-                data=compiled_md,
-                file_name=f"{t['file_prefix']}_{co_name.replace(' ', '_')}.md",
-                mime="text/markdown",
-            )
