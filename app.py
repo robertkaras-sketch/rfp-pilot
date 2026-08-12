@@ -5,89 +5,97 @@ import urllib.error
 import urllib.request
 import streamlit as st
 
-# Page setup
 st.set_page_config(
-    page_title="JanSan RFP Engine QC / Moteur d'AO JanSan",
-    page_icon="📋",
+    page_title="JanSan RFP Pilot — Intelligence & Bid Proposal Engine",
+    page_icon="🏢",
     layout="wide",
 )
 
-# ----------------- LANGUAGE SELECTION & DICTIONARY ----------------- #
-lang = st.sidebar.radio(
-    "🌐 Langue / Language", ("Français", "English"), index=0
-)
+# ----------------- LANGUAGE CONFIG ----------------- #
+lang = st.sidebar.radio("🌐 Langue / Language", ("Français", "English"), index=0)
 
 T = {
     "Français": {
-        "title": "📋 Intelligence d'Appels d'Offres Jan/San & Profil Client",
-        "caption": "Téléversez un devis (SEAO, municipal, corporatif) et saisissez les renseignements client/soumissionnaire pour générer une analyse de conformité ciblée.",
-        "customer_section": "🏢 Informations sur le Client & le Contrat",
-        "client_name": "Nom de l'organisme / Client",
-        "client_name_ph": "ex. Ville de Montréal, CISSS, Hydro-Québec...",
-        "facility_type": "Type de bâtiment / Installation",
-        "facility_types": ["Bureaux corporatifs", "Établissement de santé / CHSLD", "Établissement scolaire / Universitaire", "Édifice municipal / Gouvernemental", "Industriel / Entrepôt", "Autre"],
-        "sq_footage": "Superficie approximative (pi²)",
-        "sq_footage_ph": "ex. 85 000",
-        "est_budget": "Budget estimé / Valeur contractuelle",
-        "est_budget_ph": "ex. 250 000 $ / an",
-        "decree_status": "Assujetti au Décret d'entretien d'édifices publics ?",
-        "decree_options": ["Oui (Zone 1 - Montréal/Laval)", "Oui (Zone 2 - Régions)", "Non / Exempte", "À déterminer"],
-        "additional_notes": "Notes stratégiques ou exigences particulières",
-        "additional_notes_ph": "ex. Soumission conjointe, contraintes d'horaires de soir, certifications ISO requises...",
-        "upload_label": "Sélectionnez le fichier PDF du devis (RFP)",
-        "button_text": "Lancer l'analyse du devis & conformité",
-        "spinner_text": "Analyse directe du devis et du profil client en cours... (~15 secondes)",
-        "success_text": "Analyse complétée avec succès !",
-        "error_api_key": "Clé API manquante. Ajoutez GEMINI_API_KEY dans les Secrets Streamlit.",
-        "error_generic": "Une erreur est survenue lors de l'analyse :",
-        "summary_title": "📌 Synthèse & Alignement Client",
-        "section_mandatory": "🚨 Critères éliminatoires (Pass / Fail)",
-        "section_forms": "📎 Formulaires & Annexes obligatoires à joindre",
-        "section_scoring": "📊 Grille de pointage & Évaluation technique",
-        "section_standards": "🌱 Normes environnementales & Produits (SIMDUT / ÉcoLogo)",
-        "impact_label": "Impact",
-        "category_default": "Exigence",
-        "prompt_role": "Tu es un directeur de propositions senior spécialisé dans les appels d'offres d'entretien ménager commercial et d'hygiène/salubrité (Jan/San) au Québec et au Canada (normes SEAO, CNESST, Décret d'entretien d'édifices publics, ÉcoLogo, SIMDUT).",
-        "prompt_instruction": "Analyse le devis PDF ci-joint en tenant compte du profil client fourni, et retourne un objet JSON STRICT respectant cette structure :",
+        "title": "🏢 JanSan RFP Pilot — Moteur d'Offres & Conformité Soumissionnaire",
+        "caption": "Associez le profil, les certifications et la grille tarifaire de votre entreprise aux exigences du devis pour générer une analyse d'écart et une stratégie de soumission.",
+        "tab_profile": "1️⃣ Profil de l'Entreprise & Grille Tarifaire",
+        "tab_rfp": "2️⃣ Analyseur de Devis (RFP) & Match IA",
+        "profile_header": "Informations & Capacités du Soumissionnaire",
+        "company_name": "Raison sociale du contracteur",
+        "c_certs": "Certifications & Normes détenues",
+        "c_certs_options": [
+            "ISO 9001 (Qualité)",
+            "ISO 14001 (Environnement)",
+            "CIMS / CIMS-GB (ISSA)",
+            "Produits ÉcoLogo / Green Seal",
+            "Attestation Revenu Québec / CNESST à jour",
+            "Licence RBQ valide",
+            "Personnel avec Enquête de sécurité (Gouv/Santé)",
+        ],
+        "c_insurance": "Couverture d'assurance responsabilité civile ($ CAD)",
+        "c_bonding": "Capacité de cautionnement / Cautions d'exécution",
+        "pricing_header": "Grille Tarifaire & Paramètres Financiers",
+        "hourly_base": "Taux horaire de base proposé ($/h)",
+        "hourly_super": "Taux horaire supervision ($/h)",
+        "chem_equip_markup": "Marge / Majoration produits & équipements (%)",
+        "custom_pricing_notes": "Liste de prix personnalisée / Remarques sur les coûts",
+        "custom_pricing_ph": "ex. Lavage de vitres: 0.15$/pi², Décapage/cirage: 0.35$/pi², Forfait désinfection: 450$/intervention...",
+        "upload_header": "Téléversement du Devis d'Appel d'Offres",
+        "upload_label": "Sélectionnez le document PDF du devis (SEAO, Municipal, Privé)",
+        "analyze_btn": "Générer la Matrice de Conformité & l'Analyse d'Écart",
+        "spinner": "Analyse du devis par rapport à votre profil d'entreprise...",
+        "score_title": "🎯 Recommandation & Indice de Conformité (Go / No-Go)",
+        "gap_title": "⚠️ Analyse d'Écarts (Ce qu'il vous manque / Risques)",
+        "pricing_fit_title": "💰 Alignement Budgétaire & Grille Tarifaire",
+        "mandatory_title": "🚨 Critères Éliminatoires du Devis",
+        "forms_title": "📎 Documents et Formulaires Obligatoires à Déposer",
+        "err_key": "Clé API manquante. Ajoutez GEMINI_API_KEY dans les Secrets Streamlit.",
+        "prompt_role": "Tu es un directeur de propositions senior et un évaluateur expert pour des contrats d'entretien ménager commercial et d'hygiène/salubrité (Jan/San) au Québec/Canada.",
+        "prompt_instructions": "Compare minutieusement les exigences du devis PDF avec le profil et la grille tarifaire du contracteur ci-dessous. Retourne un JSON STRICT respectant cette structure exacte :",
     },
     "English": {
-        "title": "📋 Jan/San Tender Intelligence & Customer Profile",
-        "caption": "Upload any commercial or public tender PDF (SEAO, Buyandsell, etc.) and enter customer/project details to extract tailored compliance matrices.",
-        "customer_section": "🏢 Customer & Contract Information",
-        "client_name": "Client / Issuing Organization Name",
-        "client_name_ph": "e.g., City of Montreal, Health Authority, Public Works...",
-        "facility_type": "Facility / Building Type",
-        "facility_types": ["Corporate Offices", "Healthcare / Hospital / Long-term care", "School Board / University", "Municipal / Government Building", "Industrial / Warehouse", "Other"],
-        "sq_footage": "Approximate Square Footage (sq ft)",
-        "sq_footage_ph": "e.g., 85,000",
-        "est_budget": "Estimated Contract Value / Budget",
-        "est_budget_ph": "e.g., $250,000 / year",
-        "decree_status": "Subject to Janitorial Public Building Decree / Prevailing Wage?",
-        "decree_options": ["Yes (Zone 1)", "Yes (Zone 2)", "No / Exempt", "To be determined"],
-        "additional_notes": "Strategic Notes / Internal Priorities",
-        "additional_notes_ph": "e.g., Joint venture, night shift constraints, specific ISO certifications...",
-        "upload_label": "Select the Tender PDF Document (RFP)",
-        "button_text": "Analyze Tender & Compliance Matrix",
-        "spinner_text": "Analyzing tender PDF and client profile via AI... (~15 seconds)",
-        "success_text": "Analysis completed successfully!",
-        "error_api_key": "Missing API key. Please add GEMINI_API_KEY in Streamlit Secrets.",
-        "error_generic": "An error occurred during analysis:",
-        "summary_title": "📌 Client Summary & Bid Alignment",
-        "section_mandatory": "🚨 Mandatory Disqualifiers (Pass / Fail)",
-        "section_forms": "📎 Required Forms, Bonds & Attachments",
-        "section_scoring": "📊 Technical Scoring Matrix & Evaluation",
-        "section_standards": "🌱 Environmental Standards & Products (WHMIS / EcoLogo / Green Seal)",
-        "impact_label": "Impact",
-        "category_default": "Requirement",
-        "prompt_role": "You are a senior bid and proposal manager specializing in commercial janitorial, cleaning, and facility sanitation (Jan/San) tenders across Quebec and Canada (SEAO standards, CNESST/WCB, Janitorial Decree rules, EcoLogo, WHMIS).",
-        "prompt_instruction": "Analyze the attached tender PDF in light of the provided customer context, and return a STRICT JSON object matching this structure:",
+        "title": "🏢 JanSan RFP Pilot — Bid Intelligence & Proposal Engine",
+        "caption": "Match your company's profile, certifications, and price list directly against tender requirements for gap analysis and automated bid qualification.",
+        "tab_profile": "1️⃣ Company Profile & Price List",
+        "tab_rfp": "2️⃣ RFP Analyzer & AI Matching",
+        "profile_header": "Contractor Credentials & Qualifications",
+        "company_name": "Contractor / Company Name",
+        "c_certs": "Certifications & Accreditations Held",
+        "c_certs_options": [
+            "ISO 9001 (Quality)",
+            "ISO 14001 (Environmental)",
+            "CIMS / CIMS-GB (ISSA)",
+            "EcoLogo / Green Seal Certified Products",
+            "Valid Workers Comp (WSIB/CNESST) in good standing",
+            "General Contractor / Cleaning License",
+            "Security Cleared Personnel (Secret / Reliability)",
+        ],
+        "c_insurance": "Commercial General Liability Coverage ($ CAD)",
+        "c_bonding": "Bonding Capacity / Surety Limits",
+        "pricing_header": "Price List & Cost Multipliers",
+        "hourly_base": "Base Hourly Billing Rate ($/hr)",
+        "hourly_super": "Supervisory Hourly Rate ($/hr)",
+        "chem_equip_markup": "Chemical & Equipment Markup (%)",
+        "custom_pricing_notes": "Custom Itemized Price List & Add-on Services",
+        "custom_pricing_ph": "e.g., Window washing: $0.15/sq ft, Strip & wax: $0.35/sq ft, Electrostatic disinfection: $450/visit...",
+        "upload_header": "Tender PDF Upload",
+        "upload_label": "Select the Tender PDF Document (Buyandsell, SEAO, Corporate RFP)",
+        "analyze_btn": "Generate Compliance Matrix & Gap Analysis",
+        "spinner": "Cross-referencing tender against your contractor credentials...",
+        "score_title": "🎯 Bid Recommendation & Fit Score (Go / No-Go)",
+        "gap_title": "⚠️ Gap Analysis & Disqualification Risks",
+        "pricing_fit_title": "💰 Pricing Alignment & Applied Rates",
+        "mandatory_title": "🚨 RFP Mandatory Disqualifiers",
+        "forms_title": "📎 Mandatory Forms, Bonds & Schedules to Submit",
+        "err_key": "Missing API key. Please add GEMINI_API_KEY in Streamlit Secrets.",
+        "prompt_role": "You are a senior proposal director and procurement evaluator for commercial cleaning and janitorial/sanitation (Jan/San) tenders across Canada.",
+        "prompt_instructions": "Thoroughly cross-reference the attached tender PDF with the contractor profile and price list provided below. Return a STRICT JSON object matching this structure:",
     },
 }
 
 t = T[lang]
 
-
-# ----------------- BULLETPROOF MODEL RUNNER ----------------- #
+# ----------------- BULLETPROOF AI MODEL RUNNER ----------------- #
 def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
     discovered_models = []
     try:
@@ -97,14 +105,12 @@ def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
             data = json.loads(resp.read().decode("utf-8"))
             for m in data.get("models", []):
                 name = m.get("name", "").replace("models/", "")
-                methods = m.get("supportedGenerationMethods", [])
-                if "generateContent" in methods:
+                if "generateContent" in m.get("supportedGenerationMethods", []):
                     discovered_models.append(name)
     except Exception:
         pass
 
     discovered_models.sort(reverse=True)
-
     candidates = discovered_models + [
         "gemini-2.5-pro",
         "gemini-2.0-flash",
@@ -113,11 +119,7 @@ def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
     ]
 
     seen = set()
-    candidate_list = []
-    for m in candidates:
-        if m and m not in seen:
-            seen.add(m)
-            candidate_list.append(m)
+    candidate_list = [m for m in candidates if m and not (m in seen or seen.add(m))]
 
     payload = {
         "contents": [
@@ -148,18 +150,13 @@ def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
             with urllib.request.urlopen(req, timeout=60) as response:
                 result = json.loads(response.read().decode("utf-8"))
                 raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-
                 if raw_text.startswith("```json"):
                     raw_text = raw_text[7:]
                 if raw_text.startswith("```"):
                     raw_text = raw_text[3:]
                 if raw_text.endswith("```"):
                     raw_text = raw_text[:-3]
-
                 return json.loads(raw_text.strip())
-        except urllib.error.HTTPError as e:
-            last_error = e
-            continue
         except Exception as e:
             last_error = e
             continue
@@ -169,120 +166,156 @@ def run_gemini_analysis(api_key: str, prompt_text: str, pdf_b64: str) -> dict:
     raise RuntimeError("No compatible active model could be reached.")
 
 
-# ----------------- UI HEADER ----------------- #
+# ----------------- APP LAYOUT ----------------- #
 st.title(t["title"])
 st.caption(t["caption"])
 
-# ----------------- CUSTOMER INFORMATION INPUT FORM ----------------- #
-st.subheader(t["customer_section"])
+tab1, tab2 = st.tabs([t["tab_profile"], t["tab_rfp"]])
 
-c_col1, c_col2 = st.columns(2)
+# ----------------- TAB 1: CONTRACTOR MASTER PROFILE ----------------- #
+with tab1:
+    st.subheader(t["profile_header"])
+    col_p1, col_p2 = st.columns(2)
 
-with c_col1:
-    cust_name = st.text_input(t["client_name"], placeholder=t["client_name_ph"])
-    cust_facility = st.selectbox(t["facility_type"], t["facility_types"])
-    cust_sqft = st.text_input(t["sq_footage"], placeholder=t["sq_footage_ph"])
+    with col_p1:
+        co_name = st.text_input(t["company_name"], value="Services d'Entretien Pro-Net Inc.")
+        co_certs = st.multiselect(
+            t["c_certs"],
+            t["c_certs_options"],
+            default=[
+                t["c_certs_options"][0],
+                t["c_certs_options"][3],
+                t["c_certs_options"][4],
+            ],
+        )
 
-with c_col2:
-    cust_budget = st.text_input(t["est_budget"], placeholder=t["est_budget_ph"])
-    cust_decree = st.selectbox(t["decree_status"], t["decree_options"])
-    cust_notes = st.text_area(t["additional_notes"], placeholder=t["additional_notes_ph"], height=68)
+    with col_p2:
+        co_ins = st.selectbox(
+            t["c_insurance"],
+            ["2 000 000 $", "5 000 000 $", "10 000 000 $", "20 000 000 $+"],
+            index=1,
+        )
+        co_bond = st.selectbox(
+            t["c_bonding"],
+            ["Capacité standard (10% cautionnement)", "Capacité majeure (Cautions 50%/100%)", "Aucune caution disponible"],
+            index=0,
+        )
 
-st.markdown("---")
+    st.markdown("---")
+    st.subheader(t["pricing_header"])
+    col_pr1, col_pr2, col_pr3 = st.columns(3)
 
-# ----------------- FILE UPLOADER ----------------- #
-uploaded_file = st.file_uploader(t["upload_label"], type=["pdf"])
+    with col_pr1:
+        rate_base = st.number_input(t["hourly_base"], min_value=15.0, max_value=150.0, value=28.50, step=0.50)
+    with col_pr2:
+        rate_super = st.number_input(t["hourly_super"], min_value=20.0, max_value=200.0, value=36.00, step=0.50)
+    with col_pr3:
+        rate_markup = st.number_input(t["chem_equip_markup"], min_value=0.0, max_value=100.0, value=15.0, step=1.0)
 
-if uploaded_file is not None:
-    if st.button(t["button_text"], type="primary"):
-        with st.spinner(t["spinner_text"]):
-            try:
-                # 1. Retrieve API Key
-                api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-                if not api_key:
-                    st.error(t["error_api_key"])
-                    st.stop()
+    custom_pricing = st.text_area(
+        t["custom_pricing_notes"],
+        placeholder=t["custom_pricing_ph"],
+        value="Décapage et cirage: 0.35$/pi²\nLavage de vitres intérieur/extérieur: 0.12$/pi²\nLavage de tapis par extraction: 0.22$/pi²\nMain-d'oeuvre d'urgence 24/7: 45.00$/h",
+        height=90,
+    )
 
-                # 2. Convert PDF to base64
-                pdf_bytes = uploaded_file.read()
-                pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+    st.info("💡 Vos données de profil et vos taux sont automatiquement injectés dans l'analyseur de devis.")
 
-                # 3. Contextualize with Customer Information
-                customer_context = (
-                    f"--- CUSTOMER & BID CONTEXT ---\n"
-                    f"Target Client: {cust_name or 'Not specified'}\n"
-                    f"Facility Type: {cust_facility}\n"
-                    f"Square Footage: {cust_sqft or 'Not specified'}\n"
-                    f"Estimated Budget / Value: {cust_budget or 'Not specified'}\n"
-                    f"Decree / Wage Standard: {cust_decree}\n"
-                    f"Specific Notes: {cust_notes or 'None'}\n"
-                    f"-------------------------------"
-                )
+# ----------------- TAB 2: RFP ANALYZER & AI MATCHER ----------------- #
+with tab2:
+    st.subheader(t["upload_header"])
+    uploaded_file = st.file_uploader(t["upload_label"], type=["pdf"])
 
-                schema_dict = {
-                    "client_alignment_summary": "High level evaluation of fit, scope complexity, and key risk factors based on customer info and tender requirements",
-                    "mandatory_disqualifiers": [
-                        {
-                            "category": "Category / Catégorie",
-                            "requirement": "Description",
-                            "penalty_or_impact": "Disqualification / Rejet automatique",
-                        }
-                    ],
-                    "required_attachments_and_forms": [
-                        "List of mandatory forms, bonds, certificates"
-                    ],
-                    "technical_scoring_criteria": [
-                        "Scoring criteria & points distribution"
-                    ],
-                    "product_and_environmental_standards": [
-                        "EcoLogo, WHMIS/SIMDUT, chemical dispensing & equipment requirements"
-                    ],
-                }
+    if uploaded_file is not None:
+        if st.button(t["analyze_btn"], type="primary"):
+            with st.spinner(t["spinner"]):
+                try:
+                    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+                    if not api_key:
+                        st.error(t["err_key"])
+                        st.stop()
 
-                prompt = (
-                    f"{t['prompt_role']}\n\n"
-                    f"{customer_context}\n\n"
-                    f"{t['prompt_instruction']}\n"
-                    f"{json.dumps(schema_dict, indent=2)}"
-                )
+                    pdf_bytes = uploaded_file.read()
+                    pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
-                # 4. Run Analysis
-                data = run_gemini_analysis(api_key, prompt, pdf_base64)
+                    contractor_profile = {
+                        "company_name": co_name,
+                        "held_certifications": co_certs,
+                        "insurance_limit": co_ins,
+                        "bonding_capacity": co_bond,
+                        "hourly_labor_rate": f"{rate_base}$/h",
+                        "hourly_supervisor_rate": f"{rate_super}$/h",
+                        "chemical_equipment_markup": f"{rate_markup}%",
+                        "custom_price_list": custom_pricing,
+                    }
 
-                st.success(t["success_text"])
+                    schema_dict = {
+                        "bid_recommendation": {
+                            "decision": "GO / CONDITIONAL GO / NO-GO",
+                            "match_percentage": "85%",
+                            "executive_summary": "Brief synthesis of fit and competitiveness.",
+                        },
+                        "gap_analysis_risks": [
+                            "List of specific certifications, bonding, or technical qualifications required by the RFP that the contractor appears to lack or need to clarify."
+                        ],
+                        "pricing_strategy_alignment": "Strategic advice applying contractor's hourly/sqft rates against the tender's estimated scope.",
+                        "mandatory_disqualifiers": [
+                            {
+                                "category": "Category",
+                                "requirement": "Mandatory requirement details",
+                                "penalty": "Disqualification / Rejection",
+                            }
+                        ],
+                        "required_forms_and_bonds": [
+                            "List of mandatory annexes, statutory declarations, and bonds to submit"
+                        ],
+                    }
 
-                # 5. Display Customer Summary Alignment
-                if data.get("client_alignment_summary"):
-                    st.subheader(t["summary_title"])
-                    st.info(data["client_alignment_summary"])
+                    prompt = (
+                        f"{t['prompt_role']}\n\n"
+                        f"CONTRACTOR PROFILE & PRICE LIST:\n"
+                        f"{json.dumps(contractor_profile, ensure_ascii=False, indent=2)}\n\n"
+                        f"{t['prompt_instructions']}\n"
+                        f"{json.dumps(schema_dict, indent=2)}"
+                    )
 
-                # 6. Display Detailed Results in 2 Columns
-                col1, col2 = st.columns(2)
+                    data = run_gemini_analysis(api_key, prompt, pdf_base64)
 
-                with col1:
-                    st.subheader(t["section_mandatory"])
-                    for item in data.get("mandatory_disqualifiers", []):
-                        st.error(
-                            f"**[{item.get('category', t['category_default'])}]** "
-                            f"{item.get('requirement', '')}  \n"
-                            f"*{t['impact_label']} : {item.get('penalty_or_impact', 'Mandatory')}*"
-                        )
+                    st.success("✅ Analyse complétée avec succès!")
 
-                    st.subheader(t["section_forms"])
-                    for form in data.get("required_attachments_and_forms", []):
-                        st.markdown(f"• {form}")
+                    # 1. Recommendation Header
+                    rec = data.get("bid_recommendation", {})
+                    st.subheader(t["score_title"])
+                    st.markdown(
+                        f"### Résultat : **{rec.get('decision', 'INCONNU')}** (Score d'adéquation : **{rec.get('match_percentage', 'N/A')}**)"
+                    )
+                    st.info(rec.get("executive_summary", ""))
 
-                with col2:
-                    st.subheader(t["section_scoring"])
-                    for score in data.get("technical_scoring_criteria", []):
-                        st.info(f"**Pointage / Scoring:** {score}")
+                    # 2. Two-Column Detailed Analysis
+                    col_res1, col_res2 = st.columns(2)
 
-                    st.subheader(t["section_standards"])
-                    for std in data.get("product_and_environmental_standards", []):
-                        st.markdown(f"• {std}")
+                    with col_res1:
+                        st.subheader(t["gap_title"])
+                        for gap in data.get("gap_analysis_risks", []):
+                            st.warning(f"⚠️ {gap}")
 
-            except urllib.error.HTTPError as e:
-                error_details = e.read().decode("utf-8")
-                st.error(f"API Error ({e.code}): {error_details}")
-            except Exception as e:
-                st.error(f"{t['error_generic']} {str(e)}")
+                        st.subheader(t["mandatory_title"])
+                        for req in data.get("mandatory_disqualifiers", []):
+                            st.error(
+                                f"**[{req.get('category', 'Exigence')}]** {req.get('requirement', '')}  \n"
+                                f"*{req.get('penalty', 'Rejet')}*"
+                            )
+
+                    with col_res2:
+                        st.subheader(t["pricing_fit_title"])
+                        st.success(data.get("pricing_strategy_alignment", "Aucune remarque spécifique."))
+
+                        st.subheader(t["forms_title"])
+                        for form in data.get("required_forms_and_bonds", []):
+                            st.markdown(f"• {form}")
+
+                except urllib.error.HTTPError as e:
+                    error_details = e.read().decode("utf-8")
+                    st.error(f"API Error ({e.code}): {error_details}")
+                except Exception as e:
+                    st.error(f"Erreur : {str(e)}")
