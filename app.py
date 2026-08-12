@@ -363,3 +363,349 @@ with tab_prof:
             rate_markup = st.number_input(
                 t["rate_markup_lbl_srv"],
                 min_value=0.0,
+                max_value=100.0,
+                value=15.0,
+                step=1.0,
+            )
+
+        st.markdown(f"**{t['custom_price_h_srv']}**")
+        custom_pricing = st.text_area(
+            label="Service Pricing Matrix",
+            label_visibility="collapsed",
+            value=t["custom_price_val_srv"],
+            height=120,
+        )
+
+        contractor_profile = {
+            "mandate_type": "Facility Cleaning Services",
+            "company_name": co_name,
+            "company_address": co_addr,
+            "insurance_coverage": co_ins,
+            "certifications": co_certs,
+            "bonding_capacity": co_bond,
+            "base_cleaner_rate": f"${rate_base}/hr",
+            "supervisor_rate": f"${rate_super}/hr",
+            "chemical_markup": f"{rate_markup}%",
+            "specialty_price_matrix": custom_pricing,
+        }
+
+    else:
+        # GOODS / ITEM SUPPLY MODE
+        col_i1, col_i2 = st.columns(2)
+        with col_i1:
+            co_certs = st.multiselect(
+                t["co_certs_lbl_itm"],
+                t["co_certs_opts_itm"],
+                default=[t["co_certs_opts_itm"][0], t["co_certs_opts_itm"][1], t["co_certs_opts_itm"][3]],
+            )
+            dispenser_prog = st.selectbox(t["dispenser_lbl_itm"], t["dispenser_opts_itm"], index=0)
+        with col_i2:
+            freight_threshold = st.text_input(t["freight_lbl_itm"], value="$250.00 CAD")
+            lead_time = st.selectbox(t["lead_time_lbl_itm"], t["lead_time_opts_itm"], index=0)
+
+        st.subheader(t["custom_price_h_itm"])
+        custom_catalog = st.text_area(
+            label="Product Catalog Matrix",
+            label_visibility="collapsed",
+            value=t["custom_price_val_itm"],
+            height=150,
+        )
+
+        contractor_profile = {
+            "mandate_type": "Jan/San Goods & Item Supply",
+            "company_name": co_name,
+            "company_address": co_addr,
+            "insurance_coverage": co_ins,
+            "product_certifications": co_certs,
+            "dispenser_program": dispenser_prog,
+            "free_freight_threshold": freight_threshold,
+            "delivery_lead_time": lead_time,
+            "master_catalog_price_list": custom_catalog,
+        }
+
+    st.session_state["contractor_profile"] = contractor_profile
+    st.success(t["profile_saved"])
+
+# ----------------- SIDEBAR UPLOADER ----------------- #
+st.sidebar.markdown("---")
+st.sidebar.subheader(t["upload_h"])
+uploaded_pdf = st.sidebar.file_uploader(t["upload_lbl"], type=["pdf"])
+
+# ----------------- TAB 2: QUALIFICATION & GAP ANALYSIS ----------------- #
+with tab_qual:
+    if uploaded_pdf is None:
+        st.info(t["no_pdf_qual"])
+    else:
+        if st.button(t["btn_qual"], type="primary"):
+            with st.spinner(t["spinner_qual"]):
+                try:
+                    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+                    if not api_key:
+                        st.error(t["err_key"])
+                        st.stop()
+
+                    pdf_bytes = uploaded_pdf.read()
+                    pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+
+                    schema_qual = {
+                        "go_no_go_verdict": {
+                            "decision": "GO / CONDITIONAL GO / NO-GO",
+                            "suitability_score": "88%",
+                            "executive_rationale": "Clear rationale explaining whether the contractor/distributor meets the tender requirements.",
+                        },
+                        "gap_analysis_missing_requirements": [
+                            "Specific product spec, certification, missing SKU, or delivery term requirement that may present risk."
+                        ],
+                        "mandatory_disqualifiers": [
+                            {
+                                "category": "Category",
+                                "requirement": "Mandatory requirement details",
+                                "penalty": "Disqualification / Rejection",
+                            }
+                        ],
+                        "required_annexes_and_forms": [
+                            "Mandatory schedules, technical data sheets (TDS), SDS sheets, or surety forms to be attached."
+                        ],
+                        "scoring_matrix_summary": [
+                            "Points weighting and criteria breakdown for technical score vs. pricing."
+                        ],
+                    }
+
+                    if is_item_mode:
+                        role_qual = (
+                            f"You are a senior procurement auditor specializing in Jan/San product supply, institutional consumable goods, and equipment tenders in Canada. "
+                            f"Analyze the attached tender PDF against the vendor's catalog and logistics capabilities in {lang}."
+                        )
+                    else:
+                        role_qual = (
+                            f"You are a senior proposal auditor specializing in commercial cleaning, building maintenance, and Jan/San service tenders in Canada. "
+                            f"Analyze the attached tender PDF against the contractor's credentials and pricing in {lang}."
+                        )
+
+                    prompt = (
+                        f"{role_qual}\n\n"
+                        f"VENDOR / CONTRACTOR MASTER PROFILE:\n{json.dumps(contractor_profile, ensure_ascii=False, indent=2)}\n\n"
+                        f"Return a STRICT JSON object matching this structure in {lang}:\n"
+                        f"{json.dumps(schema_qual, indent=2)}"
+                    )
+
+                    data = run_gemini_analysis(api_key, prompt, pdf_base64)
+                    st.session_state["qual_data"] = data
+
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+
+        if "qual_data" in st.session_state:
+            qdata = st.session_state["qual_data"]
+            verdict = qdata.get("go_no_go_verdict", {})
+            st.markdown(f"### {t['verdict_lbl']} : **{verdict.get('decision', 'N/A')}** ({t['score_lbl']} : **{verdict.get('suitability_score', 'N/A')}**)")
+            st.info(verdict.get("executive_rationale", ""))
+
+            c1, c2 = st.columns(2)
+            with c1:
+                st.subheader(t["gaps_h"])
+                for gap in qdata.get("gap_analysis_missing_requirements", []):
+                    st.warning(f"• {gap}")
+
+                st.subheader(t["mandatory_h"])
+                for item in qdata.get("mandatory_disqualifiers", []):
+                    st.error(f"**[{item.get('category', t['req_lbl'])}]** {item.get('requirement', '')}  \n*{item.get('penalty', t['reject_lbl'])}*")
+
+            with c2:
+                st.subheader(t["forms_h"])
+                for f in qdata.get("required_annexes_and_forms", []):
+                    st.markdown(f"• {f}")
+
+                st.subheader(t["scoring_h"])
+                for s in qdata.get("scoring_matrix_summary", []):
+                    st.markdown(f"• {s}")
+
+# ----------------- TAB 3: COMPLETE BID PROPOSAL GENERATOR ----------------- #
+with tab_bid:
+    if uploaded_pdf is None:
+        st.info(t["no_pdf_bid"])
+    else:
+        st.write(t["bid_desc_itm"] if is_item_mode else t["bid_desc_srv"])
+        if st.button(t["btn_bid"], type="primary"):
+            with st.spinner(t["spinner_bid"]):
+                try:
+                    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+                    if not api_key:
+                        st.error(t["err_key"])
+                        st.stop()
+
+                    uploaded_pdf.seek(0)
+                    pdf_bytes = uploaded_pdf.read()
+                    pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+
+                    if is_item_mode:
+                        schema_bid = {
+                            "proposal_title": "Full formal proposal title for product supply contract",
+                            "transmittal_letter": "Formal transmittal letter addressed to the client, signed by the vendor.",
+                            "executive_summary_scope": "Understanding of the client's consumption, delivery locations, dock constraints, and sustainability goals.",
+                            "itemized_products_table": [
+                                {
+                                    "item_no": "1",
+                                    "requested_rfp_item": "Description from RFP",
+                                    "offered_product_and_brand": "Offered Brand & SKU from catalog",
+                                    "pack_size": "e.g. 48 rolls / case",
+                                    "unit_price": "$XX.XX CAD",
+                                    "eco_compliance": "EcoLogo / FSC / Green Seal / DIN",
+                                }
+                            ],
+                            "summary_metrics": {
+                                "total_items_quoted": "X items",
+                                "delivery_lead_time": contractor_profile.get("delivery_lead_time", "24-48 hrs"),
+                                "prepaid_freight_minimum": contractor_profile.get("free_freight_threshold", "$250.00 CAD"),
+                            },
+                            "supply_chain_and_logistics_plan": "Warehousing network, stock reservation commitments, backorder mitigation, and delivery SLA.",
+                            "environmental_and_technical_compliance": "WHMIS 2015 SDS management, EcoLogo/FSC proof, and Dispenser loan program guarantees.",
+                            "contractual_guarantees": "Price hold commitment (60-90 day price change notice), warranty, and return policies.",
+                        }
+
+                        role_bid = (
+                            f"You are a senior proposal director in B2B Jan/San product supply and equipment distribution. "
+                            f"Write a COMPLETE, ITEMIZED, AND FORMAL PRODUCT SUPPLY BID ready for submission to the client in {lang}. "
+                            f"Extract all requested supplies from the PDF, cross-reference them to the vendor's catalog, and generate an itemized pricing table."
+                        )
+
+                    else:
+                        schema_bid = {
+                            "proposal_title": "Full formal title of the cleaning service proposal",
+                            "transmittal_letter": "Formal transmittal cover letter addressed to the issuing client, signed on behalf of the contractor.",
+                            "executive_summary_scope": "Comprehensive understanding of the mandate, square footage, operating hours, frequencies, and standards.",
+                            "calculated_pricing_table": {
+                                "routine_cleaning_monthly": "$X,XXX.XX CAD",
+                                "routine_cleaning_annual": "$XX,XXX.XX CAD",
+                                "periodic_services_breakdown": [
+                                    "Detailed periodic task (strip & wax, windows, carpets), frequency, and calculated unit price based on contractor's price matrix"
+                                ],
+                                "total_first_year_contract_value": "$XXX,XXX.XX CAD",
+                            },
+                            "operational_plan_and_staffing": "Staffing plan, supervisor-to-cleaner ratios, shift schedules, inspection workflows, and QA protocol.",
+                            "environmental_and_safety_commitments": "WHMIS/SIMDUT compliance plan, SDS availability, EcoLogo chemicals, and HEPA equipment standard.",
+                            "compliance_guarantees": "Formal declarations of compliance with labor decrees, CNESST/WSIB, and requested insurance coverage.",
+                        }
+
+                        role_bid = (
+                            f"You are a senior proposal director in facility hygiene and contract cleaning. "
+                            f"Write a COMPLETE, FORMAL, AND ITEMIZED CLEANING SERVICE BID ready for submission in {lang}. "
+                            f"Apply the contractor's hourly rates and specialty price matrix to the square footages and frequencies in the PDF."
+                        )
+
+                    prompt_bid = (
+                        f"{role_bid}\n\n"
+                        f"VENDOR / CONTRACTOR PROFILE:\n{json.dumps(contractor_profile, ensure_ascii=False, indent=2)}\n\n"
+                        f"Return a STRICT JSON object matching this structure in {lang}:\n"
+                        f"{json.dumps(schema_bid, indent=2)}"
+                    )
+
+                    bid_data = run_gemini_analysis(api_key, prompt_bid, pdf_base64)
+                    st.session_state["bid_data"] = bid_data
+
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+
+        if "bid_data" in st.session_state:
+            b = st.session_state["bid_data"]
+            st.markdown(f"## {b.get('proposal_title', 'Proposal Document')}")
+
+            # 1. Submission Letter
+            with st.expander(t["exp_letter"], expanded=True):
+                st.markdown(b.get("transmittal_letter", ""))
+
+            # 2. Scope & Executive Summary
+            scope_exp_title = t["exp_scope_itm"] if is_item_mode else t["exp_scope_srv"]
+            with st.expander(scope_exp_title, expanded=True):
+                st.markdown(b.get("executive_summary_scope", ""))
+
+            # 3. Financial & Item Schedule
+            if is_item_mode:
+                with st.expander(t["exp_price_itm"], expanded=True):
+                    smetrics = b.get("summary_metrics", {})
+                    im1, im2, im3 = st.columns(3)
+                    im1.metric(t["metric_itm_items"], smetrics.get("total_items_quoted", "N/A"))
+                    im2.metric(t["metric_itm_lead"], smetrics.get("delivery_lead_time", "N/A"))
+                    im3.metric(t["metric_itm_freight"], smetrics.get("prepaid_freight_minimum", "N/A"))
+
+                    items = b.get("itemized_products_table", [])
+                    if items:
+                        st.table(items)
+                    else:
+                        st.info("No item lines extracted.")
+
+                with st.expander(t["exp_ops_itm"], expanded=False):
+                    st.markdown(b.get("supply_chain_and_logistics_plan", ""))
+
+                with st.expander(t["exp_env_itm"], expanded=False):
+                    st.markdown(b.get("environmental_and_technical_compliance", ""))
+                    st.markdown("---")
+                    st.markdown(b.get("contractual_guarantees", ""))
+
+                # Build Markdown Export for Items
+                items_md_table = "| Item # | Requested Item | Offered Product & SKU | Pack Size | Unit Price | Compliance |\n|---|---|---|---|---|---|\n"
+                for it in b.get("itemized_products_table", []):
+                    items_md_table += f"| {it.get('item_no','')} | {it.get('requested_rfp_item','')} | {it.get('offered_product_and_brand','')} | {it.get('pack_size','')} | {it.get('unit_price','')} | {it.get('eco_compliance','')} |\n"
+
+                compiled_md = (
+                    f"# {b.get('proposal_title', 'Jan/San Product Supply Proposal')}\n\n"
+                    f"## 1. Transmittal Letter\n{b.get('transmittal_letter', '')}\n\n"
+                    f"---\n\n"
+                    f"## 2. Executive Scope & Supply Capabilities\n{b.get('executive_summary_scope', '')}\n\n"
+                    f"---\n\n"
+                    f"## 3. Itemized Pricing & Product Cross-Reference\n\n{items_md_table}\n\n"
+                    f"---\n\n"
+                    f"## 4. Supply Chain, Logistics & Delivery SLA\n{b.get('supply_chain_and_logistics_plan', '')}\n\n"
+                    f"---\n\n"
+                    f"## 5. Technical Compliance & Environmental Standards\n{b.get('environmental_and_technical_compliance', '')}\n\n"
+                    f"{b.get('contractual_guarantees', '')}\n"
+                )
+
+            else:
+                # SERVICES DISPLAY
+                with st.expander(t["exp_price_srv"], expanded=True):
+                    ptable = b.get("calculated_pricing_table", {})
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric(t["metric_srv_monthly"], ptable.get("routine_cleaning_monthly", "N/A"))
+                    m2.metric(t["metric_srv_annual"], ptable.get("routine_cleaning_annual", "N/A"))
+                    m3.metric(t["metric_srv_total"], ptable.get("total_first_year_contract_value", "N/A"))
+
+                    st.markdown("#### Periodic & Specialty Services Schedule:")
+                    for s_item in ptable.get("periodic_services_breakdown", []):
+                        st.markdown(f"• {s_item}")
+
+                with st.expander(t["exp_ops_srv"], expanded=False):
+                    st.markdown(b.get("operational_plan_and_staffing", ""))
+
+                with st.expander(t["exp_env_srv"], expanded=False):
+                    st.markdown(b.get("environmental_and_safety_commitments", ""))
+                    st.markdown("---")
+                    st.markdown(b.get("compliance_guarantees", ""))
+
+                periodic_list_raw = ptable.get("periodic_services_breakdown", [])
+                periodic_items_formatted = "\n".join([f"- {item}" for item in periodic_list_raw])
+
+                compiled_md = (
+                    f"# {b.get('proposal_title', 'Jan/San Facility Services Bid Proposal')}\n\n"
+                    f"## 1. Transmittal Letter\n{b.get('transmittal_letter', '')}\n\n"
+                    f"---\n\n"
+                    f"## 2. Understanding of Mandate & Scope\n{b.get('executive_summary_scope', '')}\n\n"
+                    f"---\n\n"
+                    f"## 3. Financial Summary & Routine Pricing\n"
+                    f"- **Routine Cleaning (Monthly):** {ptable.get('routine_cleaning_monthly', 'N/A')}\n"
+                    f"- **Routine Cleaning (Annual):** {ptable.get('routine_cleaning_annual', 'N/A')}\n"
+                    f"- **Total Estimated First-Year Value:** {ptable.get('total_first_year_contract_value', 'N/A')}\n\n"
+                    f"### Periodic & Specialty Service Schedule:\n{periodic_items_formatted}\n\n"
+                    f"---\n\n"
+                    f"## 4. Operational Plan, Supervision & Quality Assurance\n{b.get('operational_plan_and_staffing', '')}\n\n"
+                    f"---\n\n"
+                    f"## 5. Environmental Standards, WHMIS & Safety Guarantees\n{b.get('environmental_and_safety_commitments', '')}\n\n"
+                    f"{b.get('compliance_guarantees', '')}\n"
+                )
+
+            st.download_button(
+                label=t["download_btn"],
+                data=compiled_md,
+                file_name=f"{t['file_prefix']}_{co_name.replace(' ', '_')}.md",
+                mime="text/markdown",
+            )
