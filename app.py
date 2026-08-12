@@ -331,4 +331,17 @@ with tab_prof:
 
     if not is_item_mode:
         # SERVICES MODE
-        col_
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            co_certs = st.multiselect(
+                t["co_certs_lbl_srv"],
+                t["co_certs_opts_srv"],
+                default=[t["co_certs_opts_srv"][0], t["co_certs_opts_srv"][3]],
+            )
+        with col_s2:
+            co_bond = st.selectbox(t["co_bond_lbl_srv"], t["co_bond_opts_srv"], index=0)
+
+        st.subheader(t["pricing_h_srv"])
+        pcol1, pcol2, pcol3 = st.columns(3)
+        with pcol1:
+            rate_base = st.number_input(t["rate_base_lbl_srv"], min_value=15.0, max
