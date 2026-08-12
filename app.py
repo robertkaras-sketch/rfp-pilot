@@ -344,4 +344,22 @@ with tab_prof:
         st.subheader(t["pricing_h_srv"])
         pcol1, pcol2, pcol3 = st.columns(3)
         with pcol1:
-            rate_base = st.number_input(t["rate_base_lbl_srv"], min_value=15.0, max
+            rate_base = st.number_input(
+                t["rate_base_lbl_srv"],
+                min_value=15.0,
+                max_value=200.0,
+                value=29.50,
+                step=0.50,
+            )
+        with pcol2:
+            rate_super = st.number_input(
+                t["rate_super_lbl_srv"],
+                min_value=20.0,
+                max_value=250.0,
+                value=38.00,
+                step=0.50,
+            )
+        with pcol3:
+            rate_markup = st.number_input(
+                t["rate_markup_lbl_srv"],
+                min_value=0.0,
